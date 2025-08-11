@@ -28,21 +28,29 @@ from models import User
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-
-
 @app.route('/')
 def index():
     return render_template(
         'index.html'
     )
 
+@app.route('/post')
+def post():
+    return render_template("post.html")
+
+@app.route('/comentario')
+def comentario():
+    return render_template("comentario.html")
+
+@app.route('/categoria')
+def categoria():
+    return render_template("categoria.html")
 
 @app.route('/login')
 def login():
     return render_template(
         'auth/login.html'
     )
-
 
 @app.route('/register')
 def register():
