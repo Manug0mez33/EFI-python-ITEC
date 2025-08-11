@@ -10,6 +10,17 @@ def login():
 def index():
     return render_template("index.html")
 
+@app.route('/post')
+def post():
+    return render_template("post.html")
+
+@app.route('/comentario')
+def comentario():
+    return render_template("comentario.html")
+
+@app.route('/categoria')
+def categoria():
+    return render_template("categoria.html")
 
 if __name__ == '__main__':
     app.run(debug=True)
