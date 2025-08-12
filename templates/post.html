@@ -5,7 +5,7 @@
         <h2>Crear nuevo post</h2>
         <form method="POST" action="{{ url_for('post') }}">
             <div class="mb-3">
-                <label for="title">Título</label>
+                <label for="title">Titulo</label>
                 <input type="text" class="form-control" id="title" name="title" required>
             </div>
             <div class="mb-3">
@@ -13,7 +13,7 @@
                 <textarea class="form-control" id="content" name="content" rows="4" required></textarea>
             </div>
             <div class="mb-3">
-                <label for="categories">Categorías</label>
+                <label for="categories">Categorias</label>
                 <div class="d-flex gap-2">
                     <select multiple class="form-select form-select-sm" id="categories" name="categories">
                         {% for category in categories %}
@@ -21,12 +21,12 @@
                         {% endfor %}
                     </select>
                     <div class="input-group">
-                        <input type="text" class="form-control" id="new_category" name="new_category" placeholder="Nueva categoría (opcional)">
-                        <button class="btn btn-outline-secondary" type="button" id="add_category_btn">Agregar</button>
+                        <input type="text" class="form-control" id="new_category" name="new_category" placeholder="Nueva categoria*">
+                        <button class="btn btn-outline-dark" type="button" id="add_category_btn">Agregar</button>
                     </div>
                 </div>
             </div>
-            <button type="submit" class="btn btn-primary">Publicar</button>
+            <button type="submit" class="btn btn-dark">Publicar</button>
         </form>
 
         <hr>
@@ -36,7 +36,7 @@
             <div class="card mb-3">
                 <div class="card-body">
                     <h5 class="card-title">
-                        <a href="{{ url_for('post_detail', post_id=post.id) }}">{{ post.title }}</a>
+                        {{ post.title }}
                     </h5>
                     <h6 class="card-subtitle mb-2 text-muted">
                         Por {{ post.user.username }} el {{ post.date_created.strftime('%d/%m/%Y %H:%M') if post.date_created else '' }}
@@ -44,11 +44,11 @@
                     
                     <p class="card-text">
                         {% for category in post.categories %}
-                            <span class="badge bg-primary me-1">{{ category.name }}</span>
+                            <span class="badge bg-dark me-1">{{ category.name }}</span>
                         {% endfor %}
                     </p>
-                    <p class="card-text">{{ post.content | truncate(150) }}</p> {# Usamos un filtro para acortar el contenido en la vista de lista #}
-                    <a href="{{ url_for('post_detail', post_id=post.id) }}" class="btn btn-link">Ver post completo y comentarios</a>
+                    <p class="card-text">{{ post.content | truncate(150) }}</p>
+                    <a href="{{ url_for('post_detail', post_id=post.id) }}" class="text-success text-decoration-none">Ver post y comentarios</a>
                 </div>
             </div>
             {% endfor %}
@@ -58,44 +58,35 @@
     </div>
 
     <script>
-        // Espera a que todo el contenido de la página se cargue
         document.addEventListener('DOMContentLoaded', function() {
             
-            // Selecciona los elementos del DOM que necesitamos
             const addCategoryBtn = document.getElementById('add_category_btn');
             const newCategoryInput = document.getElementById('new_category');
             const categorySelect = document.getElementById('categories');
 
-            // Añade un "escuchador de eventos" al botón
             addCategoryBtn.addEventListener('click', function() {
-                const categoryName = newCategoryInput.value.trim(); // Obtiene el valor y quita espacios
+                const categoryName = newCategoryInput.value.trim();
 
-                // Si el campo no está vacío
                 if (categoryName) {
-                    // Usamos la API fetch para enviar los datos a nuestra nueva ruta en Flask
                     fetch('{{ url_for("add_category") }}', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify({ name: categoryName }) // Convertimos el dato a un string JSON
+                        body: JSON.stringify({ name: categoryName }) 
                     })
-                    .then(response => response.json()) // Convertimos la respuesta del servidor a un objeto JS
+                    .then(response => response.json()) 
                     .then(data => {
                         if (data.success) {
-                            // Si todo salió bien, creamos una nueva opción para el <select>
                             const newOption = document.createElement('option');
                             newOption.value = data.category.id;
                             newOption.textContent = data.category.name;
-                            newOption.selected = true; // La dejamos seleccionada por defecto
+                            newOption.selected = true; 
 
-                            // Añadimos la nueva opción a la lista
                             categorySelect.appendChild(newOption);
                             
-                            // Limpiamos el campo de texto
                             newCategoryInput.value = ''; 
                         } else {
-                            // Si hubo un error, lo mostramos en la consola
                             alert(data.message || 'No se pudo agregar la categoría.');
                         }
                     })

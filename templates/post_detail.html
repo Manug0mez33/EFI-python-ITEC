@@ -9,7 +9,7 @@
 
     <div class="my-3">
         {% for category in post.categories %}
-            <span class="badge bg-primary me-1">{{ category.name }}</span>
+            <span class="badge bg-dark me-1">{{ category.name }}</span>
         {% endfor %}
     </div>
     <p class="mt-3">{{ post.content }}</p>
@@ -39,7 +39,7 @@
             <label for="content">Agregar comentario</label>
             <textarea class="form-control" id="content" name="content" rows="2" required></textarea>
         </div>
-        <button type="submit" class="btn btn-primary">Comentar</button>
+        <button type="submit" class="btn btn-dark">Comentar</button>
     </form>
 </div>
 {% endblock %}
