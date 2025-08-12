@@ -11,7 +11,7 @@
   <body>
     <nav class="navbar navbar-expand-sm navbar-light bg-light">
         <div class="container">
-            <a class="navbar-brand" href="{{ url_for('index') }}">Clima App</a>
+            <a class="navbar-brand" href="{{ url_for('index') }}">MiniBlog</a>
             <button class="navbar-toggler d-lg-none" type="button" data-toggle="collapse" data-target="#collapsibleNavId">
                 <span class="navbar-toggler-icon"></span>
             </button>
@@ -22,7 +22,7 @@
                     </li>
                     {% if current_user.is_authenticated %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('city') }}">Ciudades</a>
+                        <a class="nav-link" href="{{ url_for('post') }}">Post</a>
                     </li>
                     {% endif %}
                 </ul>

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
@@ -8,6 +8,8 @@ from flask_login import (
     logout_user,
     current_user,
 )
+
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 
@@ -35,25 +37,89 @@ def index():
     )
 
 @app.route('/post')
+@login_required
 def post():
-    return render_template("post.html")
+    return render_template(
+        "post.html"
+    )
 
 @app.route('/comentario')
+@login_required
 def comentario():
-    return render_template("comentario.html")
+    return render_template(
+        'comentario.html'
+    )
 
 @app.route('/categoria')
+@login_required
 def categoria():
-    return render_template("categoria.html")
+    return render_template(
+        'categoria.html'
+    )   
 
-@app.route('/login')
+@app.route('/login', methods=['GET', 'POST'])
 def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        user = User.query.filter_by(username=username).first()
+        
+        if user and check_password_hash(pwhash=user.password_hash, password=password):
+            login_user(user)
+            flash('Login successful.', 'success')
+            return redirect(url_for('index'))
+        else:
+            flash('Invalid username or password.', 'error')
+            return redirect(url_for('login'))
+
     return render_template(
         'auth/login.html'
     )
 
-@app.route('/register')
+@app.route('/register', methods=['GET', 'POST'])
 def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        username = request.form['username']
+        email = request.form['email']
+        password = request.form['password']
+        
+        user = User.query.filter_by(username=username).first()
+        mail = User.query.filter_by(email=email).first()
+
+        if user:
+            flash('Username already exists.', 'error')
+            return redirect(url_for('register'))
+        
+        if mail:
+            flash('Email already exists.', 'error')
+            return redirect(url_for('register'))
+        
+        #Hasheo de contraseña
+        password_hash = generate_password_hash(
+            password=password,
+            method='pbkdf2:sha256',
+        )
+
+        #Creación del nuevo usuario
+        new_user = User(
+            username=username, 
+            email=email, 
+            password_hash=password_hash
+        )
+
+        db.session.add(new_user)
+        db.session.commit()
+        flash('Registration successful. Please log in.', 'success')
+        return redirect(url_for('login'))
+        
+
     return render_template(
         'auth/register.html'
     )

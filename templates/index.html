@@ -6,10 +6,10 @@
 <div class="text-center py-5">
     {% if current_user.is_authenticated %}
         <h1 class="display-4">¡Bienvenido, {{ current_user.username }}!</h1>
-        <p class="lead">Has iniciado sesión correctamente en la Aplicación del Clima.</p>
-        <a href="{{ url_for('city') }}" class="btn btn-primary btn-lg mt-3">Ver Ciudades</a>
+        <p class="lead">Has iniciado sesión correctamente en MiniBlog.</p>
+        <a href="{{ url_for('post') }}" class="btn btn-primary btn-lg mt-3">Ver Posteos</a>
     {% else %}
-        <h1 class="display-4">Bienvenido a la Aplicación del Clima</h1>
+        <h1 class="display-4">Bienvenido a MiniBlog</h1>
         <p class="lead">Por favor inicia sesión o regístrate para acceder a todas las funcionalidades.</p>
         <div class="mt-4">
             <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg mr-3">Iniciar Sesión</a>
