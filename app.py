@@ -24,7 +24,7 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-from models import User, Post
+from models import User, Post, Comment
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -144,6 +144,29 @@ def register():
 def logout():
     logout_user()
     return redirect(url_for('index'))
+
+@app.route('/post/<int:post_id>', methods=['GET', 'POST'])
+@login_required
+def post_detail(post_id):
+    post = Post.query.get_or_404(post_id)
+    if request.method == 'POST':
+        content = request.form['content']
+
+        new_comment = Comment(
+            content=content, 
+            post_id=post.id, 
+            user_id=current_user.id
+        )
+
+        db.session.add(new_comment)
+        db.session.commit()
+        flash('Comentario agregado.', 'success')
+        return redirect(url_for('post_detail', post_id=post.id))
+    
+    return render_template(
+        'post_detail.html', 
+        post=post
+    )
 
 if __name__ == '__main__':
     app.run(debug=True)

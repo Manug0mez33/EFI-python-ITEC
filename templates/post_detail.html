@@ -1,0 +1,36 @@
+{% extends 'layout.html' %}
+
+{% block body %}
+<div class="container mt-4">
+    <h2>{{ post.title }}</h2>
+    <p>{{ post.content }}</p>
+    <hr>
+    <h4>Comentarios</h4>
+    <ul class="list-group mb-3">
+        {% for comment in post.comments %}
+            <li class="list-group-item">
+                <strong>
+                    {% if comment.user %}
+                        {{ comment.user.username }}
+                    {% else %}
+                        Usuario eliminado
+                    {% endif %}
+                </strong>: {{ comment.content }}
+                <br>
+                <small class="text-muted">
+                    {{ comment.date_created.strftime('%d/%m/%Y %H:%M') if comment.date_created else '' }}
+                </small>
+            </li>
+        {% else %}
+            <li class="list-group-item">No hay comentarios aún.</li>
+        {% endfor %}
+    </ul>
+    <form method="POST">
+        <div class="form-group">
+            <label for="content">Agregar comentario</label>
+            <textarea class="form-control" id="content" name="content" rows="2" required></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Comentar</button>
+    </form>
+</div>
+{% endblock %}

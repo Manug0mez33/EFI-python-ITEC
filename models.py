@@ -8,9 +8,9 @@ class User(db.Model, UserMixin):
     email = db.Column(db.String(100), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
     is_active = db.Column(db.Boolean, default=True)
-    
 
-    def __str__(self):
+
+    def str(self):
         return self.username
 
 
@@ -26,5 +26,23 @@ class Post(db.Model):
         lazy=True
     )
 
-    def __str__(self):
+    def str(self):
         return self.title
+
+
+class Comment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    content = db.Column(db.Text, nullable=False)
+    date_created = db.Column(db.DateTime, server_default=db.func.now())
+    post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    post = db.relationship(
+        'Post',
+        backref='comments',
+        lazy=True
+    )
+    user = db.relationship(
+        'User',
+        backref='comments',
+        lazy=True
+    )
