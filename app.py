@@ -24,7 +24,7 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-from models import User
+from models import User, Post
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -36,11 +36,27 @@ def index():
         'index.html'
     )
 
-@app.route('/post')
-@login_required
+@app.route('/post', methods=['GET', 'POST'])
 def post():
+    if request.method == 'POST':
+        title = request.form['title']
+        content = request.form['content']
+        
+        new_post = Post(
+            title=title,
+            content=content,
+            user_id=current_user.id
+        )
+        
+        db.session.add(new_post)
+        db.session.commit()
+        flash('Post created successfully.', 'success')
+        return redirect(url_for('post'))
+    
+    posts = Post.query.order_by(Post.date_created.desc()).all()
     return render_template(
-        "post.html"
+        "post.html",
+        posts=posts
     )
 
 @app.route('/comentario')

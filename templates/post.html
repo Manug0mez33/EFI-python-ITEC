@@ -1,17 +1,37 @@
 {% extends 'layout.html' %}
 
 {% block body %}
-    <div class="container mt-5" style="max-width: 600px;">
-        <h3 class="mb-3">Título del Post</h3>
+    <div class="container mt-4">
+        <h2>Crear nuevo post</h2>
+        <form method="POST" action="{{ url_for('post') }}">
+            <div class="form-group">
+                <label for="title">Título</label>
+                <input type="text" class="form-control" id="title" name="title" required>
+            </div>
+            <div class="form-group">
+                <label for="content">Contenido</label>
+                <textarea class="form-control" id="content" name="content" rows="4" required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Publicar</button>
+        </form>
+
+        <hr>
+        <h3>Posts recientes</h3>
+        {% if posts %}
+            {% for post in posts %}
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ post.title }}</h5>
+                        <h6 class="card-subtitle mb-2 text-muted">
+                            Por {{ post.user.username }} el {{ post.date_created.strftime('%d/%m/%Y %H:%M') if post.date_created else '' }}
+                        </h6>
+                        <p class="card-text">{{ post.content }}</p>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>No hay posts aún.</p>
+        {% endif %}
         
-        <p>
-        Aca va el contenido
-        </p>
-
-        <hr class="my-4">
-
-        <p class="text-muted">
-        Autor: <b>[Nombre del Usuario]</b> | Publicado el: <b>[Fecha de Creación]</b>
-        </p>
     </div>
 {% endblock %}
