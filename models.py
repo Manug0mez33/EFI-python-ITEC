@@ -1,6 +1,13 @@
 from app import db
-
 from flask_login import UserMixin
+
+
+post_categories = db.Table(
+    'post_categories',
+    db.Column('post_id', db.Integer, db.ForeignKey('post.id'), primary_key=True),
+    db.Column('category_id', db.Integer, db.ForeignKey('category.id'), primary_key=True)
+)
+
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
@@ -8,7 +15,6 @@ class User(db.Model, UserMixin):
     email = db.Column(db.String(100), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
     is_active = db.Column(db.Boolean, default=True)
-
 
     def str(self):
         return self.username
@@ -24,6 +30,11 @@ class Post(db.Model):
         'User',
         backref='posts',
         lazy=True
+    )
+    categories = db.relationship(
+        'Category',
+        secondary=post_categories,
+        backref=db.backref('posts', lazy='dynamic')
     )
 
     def str(self):
@@ -46,3 +57,11 @@ class Comment(db.Model):
         backref='comments',
         lazy=True
     )
+
+
+class Category(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+
+    def str(self):
+        return self.name

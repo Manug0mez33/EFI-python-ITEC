@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
@@ -24,7 +24,11 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-from models import User, Post, Comment
+from models import User, Post, Comment, Category
+
+@app.context_processor
+def inject_categories():
+    return dict(categories=Category.query.order_by(Category.name).all())
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -41,11 +45,14 @@ def post():
     if request.method == 'POST':
         title = request.form['title']
         content = request.form['content']
+        category_ids = request.form.getlist('categories')
+        categories = Category.query.filter(Category.id.in_(category_ids)).all()
         
         new_post = Post(
             title=title,
             content=content,
-            user_id=current_user.id
+            user_id=current_user.id,
+            categories=categories
         )
         
         db.session.add(new_post)
@@ -59,19 +66,29 @@ def post():
         posts=posts
     )
 
-@app.route('/comentario')
+@app.route('/add_category', methods=['POST'])
 @login_required
-def comentario():
-    return render_template(
-        'comentario.html'
-    )
+def add_category():
+    data = request.get_json()
+    category_name = data.get('name')
 
-@app.route('/categoria')
-@login_required
-def categoria():
-    return render_template(
-        'categoria.html'
-    )   
+    if not category_name:
+        return jsonify({'success': False, 'message': 'El nombre de la categoría no puede estar vacío.'}), 400
+    
+    if Category.query.filter_by(name=category_name).first():
+        return jsonify({'success': False, 'message': 'Esa categoría ya existe.'}), 400
+
+    new_category = Category(name=category_name)
+    db.session.add(new_category)
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'category': {
+            'id': new_category.id,
+            'name': new_category.name
+        }
+    })
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -107,27 +124,20 @@ def register():
         password = request.form['password']
         
         user = User.query.filter_by(username=username).first()
-        mail = User.query.filter_by(email=email).first()
-
+        
         if user:
             flash('Username already exists.', 'error')
             return redirect(url_for('register'))
         
-        if mail:
-            flash('Email already exists.', 'error')
-            return redirect(url_for('register'))
-        
-        #Hasheo de contraseña
         password_hash = generate_password_hash(
             password=password,
             method='pbkdf2:sha256',
         )
 
-        #Creación del nuevo usuario
         new_user = User(
-            username=username, 
+            username=username,
             email=email, 
-            password_hash=password_hash
+            password_hash=password_hash 
         )
 
         db.session.add(new_user)
@@ -141,6 +151,7 @@ def register():
     )
 
 @app.route('/logout')
+@login_required
 def logout():
     logout_user()
     return redirect(url_for('index'))
@@ -168,5 +179,6 @@ def post_detail(post_id):
         post=post
     )
 
+    
 if __name__ == '__main__':
     app.run(debug=True)
