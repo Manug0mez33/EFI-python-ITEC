@@ -33,7 +33,7 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV /home/manu/Documentos/ITEC/python/EFI/.environment
+set -gx VIRTUAL_ENV /home/manu/Documentos/ITEC/python/EFI-python-ITEC/.environment
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/"bin $PATH
