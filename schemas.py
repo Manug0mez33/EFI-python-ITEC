@@ -7,8 +7,13 @@ class UserSchema(Schema):
     id = fields.Int(dump_only=True)
     username = fields.Str(required=True)
     email = fields.Str(required=True)
-    password = fields.Str(load_only=True)
     is_active = fields.Bool()
+
+class RegisterSchema(Schema):
+    username = fields.Str(required=True)
+    email = fields.Str(required=True)
+    password = fields.Str(required=True, load_only=True)  # <-- importante
+
 
 class PostSchema(Schema):
     id = fields.Int(dump_only=True)

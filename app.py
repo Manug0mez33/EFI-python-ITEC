@@ -21,6 +21,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = (
 
 from models import db, User, Post, Comment, Category
 from schemas import UserSchema, PostSchema, CommentSchema, CategorySchema
+from views import UserAPI, UserRegisterAPI
 
 db.init_app(app)
 migrate = Migrate(app, db)
@@ -35,6 +36,22 @@ def inject_categories():
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
+# Rutas Nuevas
+
+app.add_url_rule(
+    '/users',
+    view_func=UserAPI.as_view('users_api'),
+    methods=['GET']
+)
+
+app.add_url_rule(
+    '/register',
+    view_func=UserRegisterAPI.as_view('register_api'), 
+    methods=['POST']
+)
+
+# Rutas Viejas
 
 @app.route('/')
 def index():
@@ -116,45 +133,6 @@ def login():
         'auth/login.html'
     )
 
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        try:
-            data = UserSchema().load(request.json)
-            
-            password = data.get('password')
-
-            password_hash = generate_password_hash(
-            password,
-            method='pbkdf2:sha256',
-            )
-
-            new_user = User(username=data['username'],
-                            email=data['email'],
-                            password_hash=password_hash,
-                            is_active=data.get('is_active', True)
-                            )
-            
-            user = User.query.filter_by(username=data.get('username')).first()
-            if user:
-                return jsonify({'success': False, 'message': 'Username already exists.'}), 400
-            mail = User.query.filter_by(email=data.get('email')).first()
-            if mail:
-                return jsonify({'success': False, 'message': 'Email already registered.'}), 400
-            
-            db.session.add(new_user)
-            db.session.commit()
-            jsonify({'success': True, 'message': 'User registered successfully.'}), 201
-        except ValidationError as err:
-            return {"Errors": f"{err.messages}"}, 400
-        
-        flash('Registration successful. Please log in.', 'success')
-        return UserSchema().dump(new_user)
-        
-
-    return render_template(
-        'auth/register.html'
-    )
 
 @app.route('/logout')
 @login_required
@@ -189,10 +167,7 @@ def post_detail(post_id):
         post=post
     )
 
-@app.route('/users', methods=['GET'])
-def users():
-    users = User.query.all()
-    return UserSchema(many=True).dump(users)
+
 
 
 if __name__ == '__main__':
