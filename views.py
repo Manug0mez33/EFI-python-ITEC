@@ -1,17 +1,13 @@
 from flask.views import MethodView
 from flask import request, jsonify
 from marshmallow import ValidationError
-from werkzeug.security import generate_password_hash
+from passlib.hash import bcrypt
+from flask_login import current_user
 
-from schemas import UserSchema, RegisterSchema, PostSchema
-from models import User, UserCredentials, Post
+from schemas import UserSchema, RegisterSchema, PostSchema, CommentSchema
+from models import User, UserCredentials, Post, Comment
 from app import db
 
-
-class UserAPI(MethodView):
-    def get(self):
-        users = User.query.all()
-        return UserSchema(many=True).dump(users), 200
     
 class UserRegisterAPI(MethodView):
     def post(self):
@@ -33,12 +29,7 @@ class UserRegisterAPI(MethodView):
         db.session.add(new_user)
         db.session.flush()
 
-        password = data.get('password')
-        password_hash = generate_password_hash(
-            password,
-            method='pbkdf2:sha256',
-        )
-
+        password_hash = bcrypt.hash(data['password'])
         new_credentials = UserCredentials(
             user_id=new_user.id,
             password_hash=password_hash
@@ -52,3 +43,84 @@ class PostAPI(MethodView):
     def get(self, post_id):
         post = Post.query.get_or_404(post_id)
         return PostSchema().dump(post), 200
+    
+    def post(self):
+        if not current_user.is_authenticated:
+            return {'message': 'Authentication required'}, 401 
+
+        try:
+            data = PostSchema().load(request.json)
+        except ValidationError as err:
+            return {'errors': err.messages}, 400
+
+        new_post = Post(
+            title=data['title'],
+            content=data['content'],
+            user_id=current_user.id
+        )
+        db.session.add(new_post)
+        db.session.commit()
+        return PostSchema().dump(new_post), 201
+    
+
+class PostDetailAPI(MethodView):
+    def get(self, post_id):
+        post = Post.query.get_or_404(post_id)
+        return PostSchema().dump(post), 200
+    
+    def delete(self, post_id):
+        post = Post.query.get_or_404(post_id)
+        db.session.delete(post)
+        db.session.commit()
+        return {'message': 'Post deleted'}, 200
+    
+    def put(self, post_id):
+        post = Post.query.get_or_404(post_id)
+        try:
+            data = PostSchema().load(request.json)
+        except ValidationError as err:
+            return {'errors': err.messages}, 400
+
+        post.title = data['title']
+        post.content = data['content']
+        db.session.commit()
+        return PostSchema().dump(post), 200
+    
+    def patch(self, post_id):
+        post = Post.query.get_or_404(post_id)
+        try:
+            data = PostSchema(partial=True).load(request.json)
+        except ValidationError as err:
+            return {'errors': err.messages}, 400
+
+        if 'title' in data:
+            post.title = data['title']
+        if 'content' in data:
+            post.content = data['content']
+        db.session.commit()
+        return PostSchema().dump(post), 200
+    
+
+class CommentListAPI(MethodView):
+    def get(self, post_id):
+        post = Post.query.get_or_404(post_id)
+        return CommentSchema(many=True).dump(post.comments), 200
+    
+    def post(self, post_id):
+        if not current_user.is_authenticated:
+            return {'message': 'Authentication required'}, 401
+
+        Post.query.get_or_404(post_id)
+        try:
+            data = CommentSchema().load(request.json)
+        except ValidationError as err:
+            return {'errors': err.messages}, 400
+        
+        new_comment = Comment(
+            content=data['content'],
+            post_id=post_id,
+            user_id=current_user.id
+        )
+        db.session.add(new_comment)
+        db.session.commit()
+        return CommentSchema().dump(new_comment), 201

@@ -21,7 +21,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = (
 
 from models import db, User, Post, Comment, Category
 from schemas import UserSchema, PostSchema, CommentSchema, CategorySchema
-from views import UserAPI, UserRegisterAPI
+from views import UserRegisterAPI, PostAPI
 
 db.init_app(app)
 migrate = Migrate(app, db)
@@ -40,16 +40,29 @@ def load_user(user_id):
 # Rutas Nuevas
 
 app.add_url_rule(
-    '/users',
-    view_func=UserAPI.as_view('users_api'),
-    methods=['GET']
-)
-
-app.add_url_rule(
     '/register',
     view_func=UserRegisterAPI.as_view('register_api'), 
     methods=['POST']
 )
+
+app.add_url_rule(
+    '/post',
+    view_func=PostAPI.as_view('post_api'), 
+    methods=['GET', 'POST']
+)
+
+app.add_url_rule(
+    '/post/<int:post_id>',
+    view_func=PostAPI.as_view('post_detail_api'),
+    methods=['GET', 'PATCH', 'PUT', 'DELETE']
+)
+
+app.add_url_rule(
+    '/post/<int:post_id>/comment',
+    view_func=PostAPI.as_view('post_comment_api'),
+    methods=['POST']
+)
+
 
 # Rutas Viejas
 
@@ -57,32 +70,6 @@ app.add_url_rule(
 def index():
     return render_template(
         'index.html'
-    )
-
-@app.route('/post', methods=['GET', 'POST'])
-def post():
-    if request.method == 'POST':
-        try:
-            data = PostSchema().load(request.json)
-        
-            new_post = Post(
-                title=data['title'],
-                content=data['content'],
-                user_id=data.get('user_id', current_user.id),
-                categories=data.get('categories', [])
-            )
-        
-            db.session.add(new_post)
-            db.session.commit()
-            flash('Post created successfully.', 'success')
-        except ValidationError as err:
-            flash(f'Error creating post: {err.messages}', 'error')
-        return redirect(url_for('post'))
-    
-    posts = Post.query.order_by(Post.date_created.desc()).all()
-    return render_template(
-        "post.html",
-        posts=posts
     )
 
 @app.route('/add_category', methods=['POST'])
@@ -139,36 +126,6 @@ def login():
 def logout():
     logout_user()
     return redirect(url_for('index'))
-
-@app.route('/post/<int:post_id>', methods=['GET', 'POST' ,'PATCH', 'PUT', 'DELETE'])
-@login_required
-def post_detail(post_id):
-    post = Post.query.get_or_404(post_id)
-    if request.method == 'POST':
-        try:
-            data = CommentSchema().load(request.json)
-
-            new_comment = Comment(
-                content=data['content'], 
-                post_id=data['post_id'], 
-                user_id=current_user.id
-            )
-
-            db.session.add(new_comment)
-            db.session.commit()
-            flash('Comentario agregado.', 'success')
-            return redirect(url_for('post_detail', post_id=post.id))
-        except ValidationError as err:
-            flash(f'Error al agregar comentario: {err.messages}', 'error')
-            return redirect(url_for('post_detail', post_id=post.id))
-    
-    return render_template(
-        'post_detail.html', 
-        post=post
-    )
-
-
-
 
 if __name__ == '__main__':
     app.run(debug=True)
