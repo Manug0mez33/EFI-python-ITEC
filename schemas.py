@@ -9,3 +9,21 @@ class UserSchema(Schema):
     email = fields.Str(required=True)
     password = fields.Str(load_only=True)
     is_active = fields.Bool()
+
+class PostSchema(Schema):
+    id = fields.Int(dump_only=True)
+    title = fields.Str(required=True)
+    content = fields.Str(required=True)
+    date_created = fields.DateTime(dump_only=True)
+    user_id = fields.Int(load_only=True)
+    categories = fields.List(fields.Int(), load_only=True)
+
+class CommentSchema(Schema):
+    id = fields.Int(dump_only=True)
+    content = fields.Str(required=True)
+    date_created = fields.DateTime(dump_only=True)
+    post_id = fields.Int(load_only=True)
+
+class CategorySchema(Schema):
+    id = fields.Int(dump_only=True)
+    name = fields.Str(required=True)

@@ -20,7 +20,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = (
 )
 
 from models import db, User, Post, Comment, Category
-from schemas import UserSchema
+from schemas import UserSchema, PostSchema, CommentSchema, CategorySchema
 
 db.init_app(app)
 migrate = Migrate(app, db)
@@ -45,21 +45,21 @@ def index():
 @app.route('/post', methods=['GET', 'POST'])
 def post():
     if request.method == 'POST':
-        title = request.form['title']
-        content = request.form['content']
-        category_ids = request.form.getlist('categories')
-        categories = Category.query.filter(Category.id.in_(category_ids)).all()
+        try:
+            data = PostSchema().load(request.json)
         
-        new_post = Post(
-            title=title,
-            content=content,
-            user_id=current_user.id,
-            categories=categories
-        )
+            new_post = Post(
+                title=data['title'],
+                content=data['content'],
+                user_id=data.get('user_id', current_user.id),
+                categories=data.get('categories', [])
+            )
         
-        db.session.add(new_post)
-        db.session.commit()
-        flash('Post created successfully.', 'success')
+            db.session.add(new_post)
+            db.session.commit()
+            flash('Post created successfully.', 'success')
+        except ValidationError as err:
+            flash(f'Error creating post: {err.messages}', 'error')
         return redirect(url_for('post'))
     
     posts = Post.query.order_by(Post.date_created.desc()).all()
@@ -71,24 +71,25 @@ def post():
 @app.route('/add_category', methods=['POST'])
 @login_required
 def add_category():
-    data = request.get_json()
-    category_name = data.get('name')
+    try:
+        data = CategorySchema().load(request.json)
+        category_name = data.get('name')
+        
+        if Category.query.filter_by(name=data.get('name')).first():
+            return jsonify({'success': False, 'message': 'Esa categoría ya existe.'}), 400
 
-    if not category_name:
-        return jsonify({'success': False, 'message': 'El nombre de la categoría no puede estar vacío.'}), 400
+        new_category = Category(name=data['name'])
+        db.session.add(new_category)
+        db.session.commit()
+
+    except ValidationError as err:
+        return jsonify({'success': False, 'errors': err.messages}), 400
     
-    if Category.query.filter_by(name=category_name).first():
-        return jsonify({'success': False, 'message': 'Esa categoría ya existe.'}), 400
-
-    new_category = Category(name=category_name)
-    db.session.add(new_category)
-    db.session.commit()
-
     return jsonify({
         'success': True,
         'category': {
-            'id': new_category.id,
-            'name': new_category.name
+            'id': data['id'],
+            'name': data['name']
         }
     })
 
@@ -147,9 +148,6 @@ def register():
         except ValidationError as err:
             return {"Errors": f"{err.messages}"}, 400
         
-        
-        
-        
         flash('Registration successful. Please log in.', 'success')
         return UserSchema().dump(new_user)
         
@@ -164,34 +162,35 @@ def logout():
     logout_user()
     return redirect(url_for('index'))
 
-@app.route('/post/<int:post_id>', methods=['GET', 'POST'])
+@app.route('/post/<int:post_id>', methods=['GET', 'POST' ,'PATCH', 'PUT', 'DELETE'])
 @login_required
 def post_detail(post_id):
     post = Post.query.get_or_404(post_id)
     if request.method == 'POST':
-        content = request.form['content']
+        try:
+            data = CommentSchema().load(request.json)
 
-        new_comment = Comment(
-            content=content, 
-            post_id=post.id, 
-            user_id=current_user.id
-        )
+            new_comment = Comment(
+                content=data['content'], 
+                post_id=data['post_id'], 
+                user_id=current_user.id
+            )
 
-        db.session.add(new_comment)
-        db.session.commit()
-        flash('Comentario agregado.', 'success')
-        return redirect(url_for('post_detail', post_id=post.id))
+            db.session.add(new_comment)
+            db.session.commit()
+            flash('Comentario agregado.', 'success')
+            return redirect(url_for('post_detail', post_id=post.id))
+        except ValidationError as err:
+            flash(f'Error al agregar comentario: {err.messages}', 'error')
+            return redirect(url_for('post_detail', post_id=post.id))
     
     return render_template(
         'post_detail.html', 
         post=post
     )
 
-@app.route('/users', methods=['GET', 'POST'])
+@app.route('/users', methods=['GET'])
 def users():
-    if request.method == 'POST':
-        data = request.json
-        print(data)
     users = User.query.all()
     return UserSchema(many=True).dump(users)
 
