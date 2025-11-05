@@ -1,4 +1,3 @@
-from flask_login import UserMixin
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
@@ -26,10 +25,14 @@ class UserCredentials(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
+    role = db.Column(db.String(50),nullable=False ,default='user')
     user = db.relationship(
         'User', 
         backref=db.backref('credential', uselist=False)
     )
+
+    def __str__(self) -> str:
+        return f'User Credentials for user id ={self.user_id}, role={self.role}'
 
 
 class Post(db.Model):
