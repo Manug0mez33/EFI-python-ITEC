@@ -99,23 +99,13 @@ class LoginAPI(MethodView):
         return jsonify(access_token=token)
     
 class PostAPI(MethodView):
-    jwt_required()
-    @role_required('admin', 'author', 'user')
     def get(self):
         posts = Post.query.order_by(Post.date_created.desc()).all()
         return PostSchema(many=True).dump(posts), 200
     
-    @role_required('admin', 'author', 'user')
+    @jwt_required()
     def post(self):
-        identity = get_jwt_identity()
-        if not identity:
-            return {'message': 'Se requiere autenticacion'}, 401
-        
-        try:
-            current_user = User.query.get(int(identity))
-        except Exception:
-            return {'message': 'Usuario no encontrado'}, 404
-
+        current_user = get_jwt_identity()
         try:
             data = PostSchema().load(request.json)
         except ValidationError as err:
@@ -124,24 +114,27 @@ class PostAPI(MethodView):
         new_post = Post(
             title=data['title'],
             content=data['content'],
-            user_id=current_user.id
+            user_id=int(current_user)
         )
         db.session.add(new_post)
         db.session.commit()
         return PostSchema().dump(new_post), 201
     
-
 class PostDetailAPI(MethodView):
     def get(self, post_id):
         post = Post.query.get_or_404(post_id)
         return PostSchema().dump(post), 200
     
+    @jwt_required()
     def delete(self, post_id):
         post = Post.query.get_or_404(post_id)
+        if not is_admin_or_owner(post.user_id):
+            return {'error': 'Acceso denegado: permisos insuficientes'}, 403
         db.session.delete(post)
         db.session.commit()
         return {'message': 'Post deleted'}, 200
     
+    @jwt_required()
     def put(self, post_id):
         post = Post.query.get_or_404(post_id)
         try:
@@ -149,36 +142,38 @@ class PostDetailAPI(MethodView):
         except ValidationError as err:
             return {'errors': err.messages}, 400
 
+        if not is_admin_or_owner(post.user_id):
+            return {'error': 'Acceso denegado: permisos insuficientes'}, 403
         post.title = data['title']
         post.content = data['content']
         db.session.commit()
         return PostSchema().dump(post), 200
-    
-    def patch(self, post_id):
-        post = Post.query.get_or_404(post_id)
-        try:
-            data = PostSchema(partial=True).load(request.json)
-        except ValidationError as err:
-            return {'errors': err.messages}, 400
 
-        if 'title' in data:
-            post.title = data['title']
-        if 'content' in data:
-            post.content = data['content']
-        db.session.commit()
-        return PostSchema().dump(post), 200
     
+class CommentAPI(MethodView):
+    @jwt_required()
+    def delete(self, comment_id):
+        comment = Comment.query.get_or_404(comment_id)
+        claims = get_jwt()
+        current_user_role = claims.get('role')
+
+        if (not is_admin_or_owner(comment.user_id)) and (current_user_role != 'moderator'):
+            return {'error': 'Acceso denegado: permisos insuficientes'}, 403
+        else:
+            db.session.delete(comment)
+            db.session.commit()
+            return {'message': 'Comment deleted'}, 200
 
 class CommentListAPI(MethodView):
     def get(self, post_id):
         post = Post.query.get_or_404(post_id)
         return CommentSchema(many=True).dump(post.comments), 200
     
+    @jwt_required()
     def post(self, post_id):
-        if not current_user.is_authenticated:
-            return {'message': 'Authentication required'}, 401
-
         Post.query.get_or_404(post_id)
+        current_user = get_jwt_identity()
+
         try:
             data = CommentSchema().load(request.json)
         except ValidationError as err:
@@ -187,13 +182,12 @@ class CommentListAPI(MethodView):
         new_comment = Comment(
             content=data['content'],
             post_id=post_id,
-            user_id=current_user.id
+            user_id=int(current_user)
         )
         db.session.add(new_comment)
         db.session.commit()
         return CommentSchema().dump(new_comment), 201
     
-
 class CategoryAPI(MethodView):
     def get(self):
         categories = Category.query.all()
@@ -243,15 +237,13 @@ class CategoryDetailAPI(MethodView):
         db.session.commit()
         return {'message': 'Category deleted'}, 200
     
-
 class UserAPI(MethodView):
     @jwt_required()
     @role_required('admin')
     def get(self):
         users = User.query.all()
         return UserSchema(many=True).dump(users), 200
-
-        
+    
 class UserDetailAPI(MethodView):
     @jwt_required()
     def get(self, user_id):
@@ -269,7 +261,6 @@ class UserDetailAPI(MethodView):
         db.session.commit()
         return {'message': 'Usuario desactivado'}, 200
     
-
 class UserRoleAPI(MethodView):
     @jwt_required()
     @role_required('admin')
