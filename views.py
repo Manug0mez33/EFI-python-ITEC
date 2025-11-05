@@ -30,6 +30,17 @@ def role_required(*allowed_roles: str):
         return wrapper
     return decorator
     
+def is_admin_or_owner(resource_owner_id: int) -> bool:
+    claims = get_jwt()
+    current_user_role = claims.get('role')
+    if current_user_role == 'admin':
+        return True
+    
+    user_id = int(get_jwt_identity())
+    if user_id == resource_owner_id:
+        return True
+    return False
+
 class UserRegisterAPI(MethodView):
     def post(self):
         try:
@@ -188,6 +199,8 @@ class CategoryAPI(MethodView):
         categories = Category.query.all()
         return CategorySchema(many=True).dump(categories), 200
     
+    @jwt_required()
+    @role_required('admin', 'moderator')
     def post(self):
         try:
             data = CategorySchema().load(request.json)
@@ -204,10 +217,31 @@ class CategoryAPI(MethodView):
         return jsonify({
             'success': True,
             'category': {
-                'id': data['id'],
                 'name': data['name']
             }
         })
+
+class CategoryDetailAPI(MethodView):
+    @jwt_required()
+    @role_required('admin', 'moderator')
+    def put(self, category_id):
+        category = Category.query.get_or_404(category_id)
+        try:
+            data = CategorySchema().load(request.json)
+        except ValidationError as err:
+            return {'errors': err.messages}, 400
+
+        category.name = data['name']
+        db.session.commit()
+        return {'message': 'Category updated'}, 200
+    
+    @jwt_required()
+    @role_required('admin')
+    def delete(self, category_id):
+        category = Category.query.get_or_404(category_id)
+        db.session.delete(category)
+        db.session.commit()
+        return {'message': 'Category deleted'}, 200
     
 
 class UserAPI(MethodView):
@@ -221,15 +255,11 @@ class UserAPI(MethodView):
 class UserDetailAPI(MethodView):
     @jwt_required()
     def get(self, user_id):
-        current_user_id = get_jwt_identity()
-        claims = get_jwt()
-        current_user_role = claims.get('role')
-
-        if current_user_role == 'admin' or int(current_user_id) == user_id:
-            user = User.query.get_or_404(user_id)
-            return UserSchema().dump(user), 200
-        else:
+        if not is_admin_or_owner(user_id):
             return {'error': 'Acceso denegado: permisos insuficientes'}, 403
+        user = User.query.get_or_404(user_id)
+        return UserSchema().dump(user), 200
+       
 
     @jwt_required()
     @role_required('admin')
