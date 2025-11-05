@@ -67,7 +67,7 @@ class UserRegisterAPI(MethodView):
         )
         db.session.add(credentials)
         db.session.commit()
-        return UserSchema().dump(new_user)
+        return {'message': 'Usuario registrado exitosamente'}, 201
 
 class LoginAPI(MethodView):
     def post(self):
