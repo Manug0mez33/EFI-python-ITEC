@@ -63,39 +63,22 @@ app.add_url_rule(
     methods=['POST']
 )
 
+app.add_url_rule(
+    '/category',
+    view_func=PostAPI.as_view('category_api'),
+    methods=['POST', 'GET']
+)
 
 # Rutas Viejas
 
 @app.route('/')
 def index():
-    return render_template(
-        'index.html'
-    )
-
-@app.route('/add_category', methods=['POST'])
-@login_required
-def add_category():
-    try:
-        data = CategorySchema().load(request.json)
-        category_name = data.get('name')
-        
-        if Category.query.filter_by(name=data.get('name')).first():
-            return jsonify({'success': False, 'message': 'Esa categoría ya existe.'}), 400
-
-        new_category = Category(name=data['name'])
-        db.session.add(new_category)
-        db.session.commit()
-
-    except ValidationError as err:
-        return jsonify({'success': False, 'errors': err.messages}), 400
-    
     return jsonify({
-        'success': True,
-        'category': {
-            'id': data['id'],
-            'name': data['name']
-        }
-    })
+        "api_name": "Mi Proyecto API",
+        "status": "ok",
+        "version": "1.0.0"
+    }), 200
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():

@@ -4,8 +4,8 @@ from marshmallow import ValidationError
 from passlib.hash import bcrypt
 from flask_login import current_user
 
-from schemas import UserSchema, RegisterSchema, PostSchema, CommentSchema
-from models import User, UserCredentials, Post, Comment
+from schemas import UserSchema, RegisterSchema, PostSchema, CommentSchema, CategorySchema
+from models import User, UserCredentials, Post, Comment, Category
 from app import db
 
     
@@ -124,3 +124,30 @@ class CommentListAPI(MethodView):
         db.session.add(new_comment)
         db.session.commit()
         return CommentSchema().dump(new_comment), 201
+    
+
+class CategoryAPI(MethodView):
+    def get(self):
+        categories = Category.query.all()
+        return CategorySchema(many=True).dump(categories), 200
+    
+    def post(self):
+        try:
+            data = CategorySchema().load(request.json)
+        except ValidationError as err:
+            return jsonify({'success': False, 'errors': err.messages}), 400
+        
+        if Category.query.filter_by(name=data.get('name')).first():
+            return jsonify({'success': False, 'message': 'Esa categoría ya existe.'}), 400
+        
+        new_category = Category(name=data['name'])
+        db.session.add(new_category)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'category': {
+                'id': data['id'],
+                'name': data['name']
+            }
+        })
