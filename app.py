@@ -12,7 +12,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = 'clave-ultra-secreta'
 
 from models import db
-from views import UserRegisterAPI, PostAPI, LoginAPI, PostDetailAPI, CategoryAPI, CommentListAPI, UserAPI, UserDetailAPI, UserRoleAPI
+from views import UserRegisterAPI, PostAPI, LoginAPI, PostDetailAPI, CategoryAPI, CommentListAPI, UserAPI, UserDetailAPI, UserRoleAPI, StatsAPI
 
 jwt = JWTManager(app)
 db.init_app(app)
@@ -71,6 +71,12 @@ app.add_url_rule(
     '/users/<int:user_id>/role',
     view_func=UserRoleAPI.as_view('user_role_api'),
     methods=['PATCH']
+)
+
+app.add_url_rule(
+    '/stats',
+    view_func=StatsAPI.as_view('stats_api'),
+    methods=['GET']
 )
 
 

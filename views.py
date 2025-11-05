@@ -253,3 +253,22 @@ class UserRoleAPI(MethodView):
         user.credential.role = data['role']
         db.session.commit()
         return {'message': 'Rol de usuario actualizado'}, 200
+    
+class StatsAPI(MethodView):
+    @jwt_required()
+    @role_required('admin', 'moderator')
+    def get(self):
+        total_posts = Post.query.count()
+        total_comments = Comment.query.count()
+        total_users = User.query.count()
+        post_last_week = Post.query.filter(
+            Post.date_created >= db.func.now() - db.text('INTERVAL 7 DAY')
+        ).count()
+
+        stats = {
+            'total_posts': total_posts,
+            'total_comments': total_comments,
+            'total_users': total_users,
+            'posts_last_week': post_last_week
+        }
+        return jsonify(stats), 200
