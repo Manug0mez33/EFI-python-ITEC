@@ -1,5 +1,5 @@
 from marshmallow import Schema, fields
-
+from marshmallow import validate
 from app import db
 from models import User
 
@@ -36,3 +36,6 @@ class CommentSchema(Schema):
 class CategorySchema(Schema):
     id = fields.Int(dump_only=True)
     name = fields.Str(required=True)
+
+class RoleUpdateSchema(Schema):
+    role = fields.Str(required=True, validate=validate.OneOf(['admin', 'user', 'moderator']))

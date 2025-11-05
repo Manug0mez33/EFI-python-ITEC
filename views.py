@@ -13,7 +13,7 @@ from flask_login import current_user
 
 from functools import wraps
 from typing import Any, Dict
-from schemas import UserSchema, RegisterSchema, LoginSchema, PostSchema, CommentSchema, CategorySchema
+from schemas import UserSchema, RegisterSchema, LoginSchema, PostSchema, CommentSchema, CategorySchema, RoleUpdateSchema
 from models import User, UserCredentials, Post, Comment, Category
 from app import db
 
@@ -208,3 +208,48 @@ class CategoryAPI(MethodView):
                 'name': data['name']
             }
         })
+    
+
+class UserAPI(MethodView):
+    @jwt_required()
+    @role_required('admin')
+    def get(self):
+        users = User.query.all()
+        return UserSchema(many=True).dump(users), 200
+
+        
+class UserDetailAPI(MethodView):
+    @jwt_required()
+    def get(self, user_id):
+        current_user_id = get_jwt_identity()
+        claims = get_jwt()
+        current_user_role = claims.get('role')
+
+        if current_user_role == 'admin' or int(current_user_id) == user_id:
+            user = User.query.get_or_404(user_id)
+            return UserSchema().dump(user), 200
+        else:
+            return {'error': 'Acceso denegado: permisos insuficientes'}, 403
+
+    @jwt_required()
+    @role_required('admin')
+    def delete(self, user_id):
+        user = User.query.get_or_404(user_id)
+        user.is_active = False
+        db.session.commit()
+        return {'message': 'Usuario desactivado'}, 200
+    
+
+class UserRoleAPI(MethodView):
+    @jwt_required()
+    @role_required('admin')
+    def patch(self, user_id):
+        try:
+            data = RoleUpdateSchema(partial=True).load(request.json)
+        except ValidationError as err:
+            return {'errors': err.messages}, 400
+
+        user = User.query.get_or_404(user_id)
+        user.credential.role = data['role']
+        db.session.commit()
+        return {'message': 'Rol de usuario actualizado'}, 200

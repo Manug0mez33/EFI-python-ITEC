@@ -2,9 +2,6 @@ from flask import Flask, jsonify
 from flask_jwt_extended import JWTManager
 from flask_migrate import Migrate
 
-
-
-
 app = Flask(__name__)
 
 
@@ -14,20 +11,13 @@ app.config['SQLALCHEMY_DATABASE_URI'] = (
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = 'clave-ultra-secreta'
 
-from models import db, Category
-from views import UserRegisterAPI, PostAPI, LoginAPI, PostDetailAPI, CategoryAPI, CommentListAPI
+from models import db
+from views import UserRegisterAPI, PostAPI, LoginAPI, PostDetailAPI, CategoryAPI, CommentListAPI, UserAPI, UserDetailAPI, UserRoleAPI
 
 jwt = JWTManager(app)
 db.init_app(app)
 migrate = Migrate(app, db)
 
-
-@app.context_processor
-def inject_categories():
-    return dict(categories=Category.query.order_by(Category.name).all())
-
-
-# Rutas Nuevas
 
 app.add_url_rule(
     '/register',
@@ -65,7 +55,24 @@ app.add_url_rule(
     methods=['POST', 'GET']
 )
 
-# Rutas Viejas
+app.add_url_rule(
+    '/users',
+    view_func=UserAPI.as_view('user_api'),
+    methods=['GET']
+)
+
+app.add_url_rule(
+    '/users/<int:user_id>',
+    view_func=UserDetailAPI.as_view('user_detail_api'),
+    methods=['GET', 'DELETE']
+)
+
+app.add_url_rule(
+    '/users/<int:user_id>/role',
+    view_func=UserRoleAPI.as_view('user_role_api'),
+    methods=['PATCH']
+)
+
 
 @app.route('/')
 def index():
