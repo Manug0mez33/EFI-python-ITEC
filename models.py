@@ -40,7 +40,9 @@ class Post(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100), nullable=False)
     content = db.Column(db.Text, nullable=False)
-    date_created = db.Column(db.DateTime, server_default=db.func.now())
+    date_created = db.Column(db.DateTime, server_default=db.func.now())                                     
+    is_published = db.Column(db.Boolean, default=True)
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     user = db.relationship(
         'User',
@@ -61,6 +63,7 @@ class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     content = db.Column(db.Text, nullable=False)
     date_created = db.Column(db.DateTime, server_default=db.func.now())
+    is_visible = db.Column(db.Boolean, default=True)
     post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     post = db.relationship(
