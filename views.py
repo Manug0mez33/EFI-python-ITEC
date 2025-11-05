@@ -1,13 +1,34 @@
+from datetime import timedelta
 from flask.views import MethodView
 from flask import request, jsonify
 from marshmallow import ValidationError
-from passlib.hash import bcrypt
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask_jwt_extended import (
+    jwt_required,
+    create_access_token,
+    get_jwt,
+    get_jwt_identity
+)
 from flask_login import current_user
 
-from schemas import UserSchema, RegisterSchema, PostSchema, CommentSchema, CategorySchema
+from functools import wraps
+from typing import Any, Dict
+from schemas import UserSchema, RegisterSchema, LoginSchema, PostSchema, CommentSchema, CategorySchema
 from models import User, UserCredentials, Post, Comment, Category
 from app import db
 
+def role_required(*allowed_roles: str):
+    def decorator(fn):
+        @wraps(fn)
+        @jwt_required()
+        def wrapper(*args, **kwargs):
+            claims = get_jwt()
+            role = claims.get('role')
+            if role not in allowed_roles:
+                return {'error': 'Acceso denegado: permisos insuficientes'}, 403
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
     
 class UserRegisterAPI(MethodView):
     def post(self):
@@ -15,9 +36,7 @@ class UserRegisterAPI(MethodView):
             data = RegisterSchema().load(request.json)
         except ValidationError as err:
             return {'errors': err.messages}, 400
-
-        if User.query.filter_by(username=data['username']).first():
-            return {'message': 'Este nombre de usuario ya ha sido utilizado'}, 400
+        
         if User.query.filter_by(email=data['email']).first():
             return {'message': 'Esta direccion de correo ya ha sido utilizada'}, 400
 
@@ -29,24 +48,62 @@ class UserRegisterAPI(MethodView):
         db.session.add(new_user)
         db.session.flush()
 
-        password_hash = bcrypt.hash(data['password'])
-        new_credentials = UserCredentials(
+        password_hash = generate_password_hash(data['password'], method='pbkdf2:sha256')
+        credentials = UserCredentials(
             user_id=new_user.id,
-            password_hash=password_hash
+            password_hash=password_hash,
+            role=data['role']
         )
-        db.session.add(new_credentials)
+        db.session.add(credentials)
         db.session.commit()
         return UserSchema().dump(new_user)
 
-
-class PostAPI(MethodView):
-    def get(self, post_id):
-        post = Post.query.get_or_404(post_id)
-        return PostSchema().dump(post), 200
-    
+class LoginAPI(MethodView):
     def post(self):
-        if not current_user.is_authenticated:
-            return {'message': 'Authentication required'}, 401 
+        try:
+            data = LoginSchema().load(request.json)
+        except ValidationError as err:
+            return {'errors': err.messages}, 400
+
+        user = User.query.filter_by(email=data['email']).first()
+        if not user or not user.credential:
+            return {'message': 'Usuario no encontrado'}, 404
+
+        if not check_password_hash(user.credential.password_hash, data['password']):
+            return {'message': 'Credenciales inválidas'}, 401
+
+        additional_claims = {
+            'email': user.email,
+            'role': user.credential.role,
+            'username': user.username
+            }
+
+        identity = str(user.id)
+        token = create_access_token(
+            identity=identity,
+            additional_claims=additional_claims,
+            expires_delta=timedelta(hours=24)
+        )
+
+        return jsonify(access_token=token)
+    
+class PostAPI(MethodView):
+    jwt_required()
+    @role_required('admin', 'author', 'user')
+    def get(self):
+        posts = Post.query.order_by(Post.date_created.desc()).all()
+        return PostSchema(many=True).dump(posts), 200
+    
+    @role_required('admin', 'author', 'user')
+    def post(self):
+        identity = get_jwt_identity()
+        if not identity:
+            return {'message': 'Se requiere autenticacion'}, 401
+        
+        try:
+            current_user = User.query.get(int(identity))
+        except Exception:
+            return {'message': 'Usuario no encontrado'}, 404
 
         try:
             data = PostSchema().load(request.json)
