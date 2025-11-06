@@ -17,6 +17,11 @@ from typing import Any, Dict
 from schemas import UserSchema, RegisterSchema, LoginSchema, PostSchema, CommentSchema, CategorySchema, RoleUpdateSchema
 from models import User, UserCredentials, Post, Comment, Category
 from app import db, limiter
+from services.post_service import PostService
+from services.user_service import UserService
+from services.comment_service import CommentService
+from services.category_service import CategoryService
+from services.stats_service import StatsService
 
 def get_user_identity_from_jwt():
     return int(get_jwt_identity())
@@ -46,34 +51,22 @@ def is_admin_or_owner(resource_owner_id: int) -> bool:
     return False
 
 class UserRegisterAPI(MethodView):
+    def __init__(self):
+        self.service = UserService()
+
     def post(self):
         try:
             data = RegisterSchema().load(request.json)
         except ValidationError as err:
             return {'errors': err.messages}, 400
         
-        if User.query.filter_by(email=data['email']).first():
-            return {'message': 'Esta direccion de correo ya ha sido utilizada'}, 400
-
-        new_user = User(
-            username=data['username'],
-            email=data['email'],
-            is_active=True
-        )
-        db.session.add(new_user)
-        db.session.flush()
-
-        password_hash = generate_password_hash(data['password'], method='pbkdf2:sha256')
-        credentials = UserCredentials(
-            user_id=new_user.id,
-            password_hash=password_hash,
-            role=data['role']
-        )
-        db.session.add(credentials)
-        db.session.commit()
-        return {'message': 'Usuario registrado exitosamente'}, 201
+        result, status_code = self.service.register_user(data)
+        return result, status_code
 
 class LoginAPI(MethodView):
+    def __init__(self):
+        self.service = UserService()
+
     @limiter.limit('10 per hour')
     def post(self):
         try:
@@ -81,84 +74,35 @@ class LoginAPI(MethodView):
         except ValidationError as err:
             return {'errors': err.messages}, 400
 
-        user = User.query.filter_by(email=data['email']).first()
-        if not user or not user.credential:
-            return {'message': 'Usuario no encontrado'}, 404
-
-        if not check_password_hash(user.credential.password_hash, data['password']):
-            return {'message': 'Credenciales inválidas'}, 401
-
-        additional_claims = {
-            'email': user.email,
-            'role': user.credential.role,
-            'username': user.username
-            }
-
-        identity = str(user.id)
-        access_token = create_access_token(
-            identity=identity,
-            additional_claims=additional_claims
-        )
-        refresh_token = create_refresh_token(identity=identity)
-
-        return jsonify(access_token=access_token, refresh_token=refresh_token)
+        result, status_code = self.service.login_user(data)
+        if status_code == 200:
+            return jsonify(result)
+        return result, status_code
     
 class RefreshAPI(MethodView):
+    def __init__(self):
+        self.service = UserService()
+
     @jwt_required(refresh=True)
     def post(self):
         identity = get_jwt_identity()
-        user = User.query.get(int(identity))
-        if not user or not user.is_active:
-            return {'message': 'Usuario no encontrado o inactivo'}, 404
-        
-        additional_claims = {
-            'email': user.email,
-            'role': user.credential.role,
-            'username': user.username
-        }
-    
-        new_access_token = create_access_token(
-            identity=identity,
-            additional_claims=additional_claims,
-            expires_delta=timedelta(hours=24)
-        )
-        return jsonify(access_token=new_access_token)
+        result, status_code = self.service.refresh_token(identity)
+        if status_code == 200:
+            return jsonify(result)
+        return result, status_code
 
 class PostAPI(MethodView):
+    def __init__(self):
+        self.service = PostService()
+
     def get(self):
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
-
         author_username = request.args.get('author_username', type=str)
         category_name = request.args.get('category_name', type=str)
-
-        query = Post.query
-
-        if author_username:
-            query = query.join(User).filter(User.username == author_username)
-
-        if category_name:
-            query = query.filter(Post.categories.any(name=category_name)) 
-
-        query = query.order_by(Post.date_created.desc())
-
-        paginated_posts = query.paginate(
-            page=page,
-            per_page=per_page,
-            error_out=False
-        )
-
-        return jsonify({
-            'posts': PostSchema(many=True).dump(paginated_posts.items),
-            'pagination': {
-                'total_pages': paginated_posts.pages,
-                'total_items': paginated_posts.total,
-                'current_page': paginated_posts.page,
-                'per_page': paginated_posts.per_page,
-                'has_next': paginated_posts.has_next,
-                'has_prev': paginated_posts.has_prev
-            }
-        }), 200
+        
+        result = self.service.get_all_posts(page, per_page, author_username, category_name)
+        return jsonify(result), 200
 
     @limiter.limit('10 per hour', key_func=get_user_identity_from_jwt)
     @jwt_required()
@@ -169,68 +113,71 @@ class PostAPI(MethodView):
         except ValidationError as err:
             return {'errors': err.messages}, 400
 
-        new_post = Post(
-            title=data['title'],
-            content=data['content'],
-            user_id=int(current_user)
-        )
-        db.session.add(new_post)
-        db.session.commit()
-        return PostSchema().dump(new_post), 201
+        new_post = self.service.create_post(data['title'], data['content'], int(current_user))
+        return new_post, 201
     
 class PostDetailAPI(MethodView):
+    def __init__(self):
+        self.service = PostService()
+
     def get(self, post_id):
-        post = Post.query.get_or_404(post_id)
-        return PostSchema().dump(post), 200
+        post = self.service.get_post_by_id(post_id)
+        return post, 200
     
     @jwt_required()
     def delete(self, post_id):
-        post = Post.query.get_or_404(post_id)
-        if not is_admin_or_owner(post.user_id):
+        post = self.service.get_post_by_id(post_id)
+        if not is_admin_or_owner(post['user_id']):
             return {'error': 'Acceso denegado: permisos insuficientes'}, 403
-        db.session.delete(post)
-        db.session.commit()
+        self.service.delete_post(post_id)
         return {'message': 'Post deleted'}, 200
     
     @jwt_required()
     def put(self, post_id):
-        post = Post.query.get_or_404(post_id)
         try:
             data = PostSchema().load(request.json)
         except ValidationError as err:
             return {'errors': err.messages}, 400
 
-        if not is_admin_or_owner(post.user_id):
+        post = self.service.get_post_by_id(post_id)
+        if not is_admin_or_owner(post['user_id']):
             return {'error': 'Acceso denegado: permisos insuficientes'}, 403
-        post.title = data['title']
-        post.content = data['content']
-        db.session.commit()
-        return PostSchema().dump(post), 200
+        
+        updated_post = self.service.update_post(post_id, data['title'], data['content'])
+        return updated_post, 200
 
     
 class CommentAPI(MethodView):
+    def __init__(self):
+        self.service = CommentService()
+
     @jwt_required()
     def delete(self, comment_id):
-        comment = Comment.query.get_or_404(comment_id)
+        comment = self.service.comment_repository.get_by_id(comment_id)
         claims = get_jwt()
         current_user_role = claims.get('role')
 
         if (not is_admin_or_owner(comment.user_id)) and (current_user_role != 'moderator'):
             return {'error': 'Acceso denegado: permisos insuficientes'}, 403
         else:
-            db.session.delete(comment)
-            db.session.commit()
+            self.service.delete_comment(comment_id)
             return {'message': 'Comment deleted'}, 200
 
 class CommentListAPI(MethodView):
+    def __init__(self):
+        self.service = CommentService()
+        self.post_service = PostService()
+
     def get(self, post_id):
-        post = Post.query.get_or_404(post_id)
-        return CommentSchema(many=True).dump(post.comments), 200
+        #This should be handled by the post service
+        self.post_service.get_post_by_id(post_id)
+        comments = self.service.get_comments_by_post(post_id)
+        return comments, 200
     
     @limiter.limit('30 per hour', key_func=get_user_identity_from_jwt)
     @jwt_required()
     def post(self, post_id):
-        Post.query.get_or_404(post_id)
+        self.post_service.get_post_by_id(post_id)
         current_user = get_jwt_identity()
 
         try:
@@ -238,19 +185,20 @@ class CommentListAPI(MethodView):
         except ValidationError as err:
             return {'errors': err.messages}, 400
         
-        new_comment = Comment(
+        new_comment = self.service.create_comment(
             content=data['content'],
             post_id=post_id,
             user_id=int(current_user)
         )
-        db.session.add(new_comment)
-        db.session.commit()
-        return CommentSchema().dump(new_comment), 201
+        return new_comment, 201
     
 class CategoryAPI(MethodView):
+    def __init__(self):
+        self.service = CategoryService()
+
     def get(self):
-        categories = Category.query.all()
-        return CategorySchema(many=True).dump(categories), 200
+        categories = self.service.get_all_categories()
+        return categories, 200
     
     @jwt_required()
     @role_required('admin', 'moderator')
@@ -260,67 +208,62 @@ class CategoryAPI(MethodView):
         except ValidationError as err:
             return jsonify({'success': False, 'errors': err.messages}), 400
         
-        if Category.query.filter_by(name=data.get('name')).first():
-            return jsonify({'success': False, 'message': 'Esa categoría ya existe.'}), 400
-        
-        new_category = Category(name=data['name'])
-        db.session.add(new_category)
-        db.session.commit()
-
-        return jsonify({
-            'success': True,
-            'category': {
-                'name': data['name']
-            }
-        })
+        result, status_code = self.service.create_category(data['name'])
+        return result, status_code
 
 class CategoryDetailAPI(MethodView):
+    def __init__(self):
+        self.service = CategoryService()
+
     @jwt_required()
     @role_required('admin', 'moderator')
     def put(self, category_id):
-        category = Category.query.get_or_404(category_id)
         try:
             data = CategorySchema().load(request.json)
         except ValidationError as err:
             return {'errors': err.messages}, 400
 
-        category.name = data['name']
-        db.session.commit()
-        return {'message': 'Category updated'}, 200
+        updated_category = self.service.update_category(category_id, data['name'])
+        return updated_category, 200
     
     @jwt_required()
     @role_required('admin')
     def delete(self, category_id):
-        category = Category.query.get_or_404(category_id)
-        db.session.delete(category)
-        db.session.commit()
+        self.service.delete_category(category_id)
         return {'message': 'Category deleted'}, 200
     
 class UserAPI(MethodView):
+    def __init__(self):
+        self.service = UserService()
+
     @jwt_required()
     @role_required('admin')
     def get(self):
-        users = User.query.all()
-        return UserSchema(many=True).dump(users), 200
+        users = self.service.get_all_users()
+        return users, 200
     
 class UserDetailAPI(MethodView):
+    def __init__(self):
+        self.service = UserService()
+
     @jwt_required()
     def get(self, user_id):
         if not is_admin_or_owner(user_id):
             return {'error': 'Acceso denegado: permisos insuficientes'}, 403
-        user = User.query.get_or_404(user_id)
-        return UserSchema().dump(user), 200
+        user = self.service.get_user_by_id(user_id)
+        return user, 200
        
 
     @jwt_required()
     @role_required('admin')
     def delete(self, user_id):
-        user = User.query.get_or_404(user_id)
-        user.is_active = False
-        db.session.commit()
+        self.service.deactivate_user(user_id)
         return {'message': 'Usuario desactivado'}, 200
     
 class UserRoleAPI(MethodView):
+    def __init__(self):
+        self.service = UserService()
+
     @jwt_required()
     @role_required('admin')
     def patch(self, user_id):
@@ -329,26 +272,15 @@ class UserRoleAPI(MethodView):
         except ValidationError as err:
             return {'errors': err.messages}, 400
 
-        user = User.query.get_or_404(user_id)
-        user.credential.role = data['role']
-        db.session.commit()
-        return {'message': 'Rol de usuario actualizado'}, 200
+        result, status_code = self.service.update_user_role(user_id, data['role'])
+        return result, status_code
     
 class StatsAPI(MethodView):
+    def __init__(self):
+        self.service = StatsService()
+
     @jwt_required()
     @role_required('admin', 'moderator')
     def get(self):
-        total_posts = Post.query.count()
-        total_comments = Comment.query.count()
-        total_users = User.query.count()
-        post_last_week = Post.query.filter(
-            Post.date_created >= db.func.now() - db.text('INTERVAL 7 DAY')
-        ).count()
-
-        stats = {
-            'total_posts': total_posts,
-            'total_comments': total_comments,
-            'total_users': total_users,
-            'posts_last_week': post_last_week
-        }
+        stats = self.service.get_stats()
         return jsonify(stats), 200
