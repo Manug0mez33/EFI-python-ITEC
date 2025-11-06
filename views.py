@@ -6,6 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import (
     jwt_required,
     create_access_token,
+    create_refresh_token,
     get_jwt,
     get_jwt_identity
 )
@@ -90,14 +91,35 @@ class LoginAPI(MethodView):
             }
 
         identity = str(user.id)
-        token = create_access_token(
+        access_token = create_access_token(
+            identity=identity,
+            additional_claims=additional_claims
+        )
+        refresh_token = create_refresh_token(identity=identity)
+
+        return jsonify(access_token=access_token, refresh_token=refresh_token)
+    
+class RefreshAPI(MethodView):
+    @jwt_required(refresh=True)
+    def post(self):
+        identity = get_jwt_identity()
+        user = User.query.get(int(identity))
+        if not user or not user.is_active:
+            return {'message': 'Usuario no encontrado o inactivo'}, 404
+        
+        additional_claims = {
+            'email': user.email,
+            'role': user.credential.role,
+            'username': user.username
+        }
+    
+        new_access_token = create_access_token(
             identity=identity,
             additional_claims=additional_claims,
             expires_delta=timedelta(hours=24)
         )
+        return jsonify(access_token=new_access_token)
 
-        return jsonify(access_token=token)
-    
 class PostAPI(MethodView):
     def get(self):
         posts = Post.query.order_by(Post.date_created.desc()).all()
