@@ -31,80 +31,67 @@ migrate = Migrate(app, db)
 
 app.add_url_rule(
     '/refresh',
-    view_func=RefreshAPI.as_view('refresh_api'),
-    methods=['POST']
+    view_func=RefreshAPI.as_view('refresh_api')
 )
 
 app.add_url_rule(
     '/register',
-    view_func=UserRegisterAPI.as_view('register_api'), 
-    methods=['POST']
+    view_func=UserRegisterAPI.as_view('register_api')
 )
 
 app.add_url_rule(
     '/login',
-    view_func=LoginAPI.as_view('login_api'),
-    methods=['POST']
+    view_func=LoginAPI.as_view('login_api')
 )
 
 app.add_url_rule(
     '/post',
-    view_func=PostAPI.as_view('post_api'), 
-    methods=['POST', 'GET']
+    view_func=PostAPI.as_view('post_api')
 )
 
 app.add_url_rule(
     '/post/<int:post_id>',
-    view_func=PostDetailAPI.as_view('post_detail_api'),
-    methods=['GET', 'PUT', 'DELETE']
+    view_func=PostDetailAPI.as_view('post_detail_api')
 )
 
 app.add_url_rule(
     '/post/<int:post_id>/comments',
-    view_func=CommentListAPI.as_view('post_comment_api'),
-    methods=['POST', 'GET']
+    view_func=CommentListAPI.as_view('post_comment_api')
 )
 
 app.add_url_rule(
     '/comments/<int:comment_id>',
-    view_func=CommentAPI.as_view('comment_api'),
-    methods=['DELETE']  
+    view_func=CommentAPI.as_view('comment_api')
 )
 
 app.add_url_rule(
     '/category',
-    view_func=CategoryAPI.as_view('category_api'),
-    methods=['POST', 'GET']
+    view_func=CategoryAPI.as_view('category_api')
 )
 
 app.add_url_rule(
     '/category/<int:category_id>',
-    view_func=CategoryDetailAPI.as_view('category_detail_api'),
-    methods=['PUT', 'DELETE']
+    view_func=CategoryDetailAPI.as_view('category_detail_api')
 )
 
 app.add_url_rule(
     '/users',
-    view_func=UserAPI.as_view('user_api'),
-    methods=['GET']
+    view_func=UserAPI.as_view('user_api')
 )
 
 app.add_url_rule(
     '/users/<int:user_id>',
-    view_func=UserDetailAPI.as_view('user_detail_api'),
-    methods=['GET', 'DELETE']
+    view_func=UserDetailAPI.as_view('user_detail_api')
 )
 
 app.add_url_rule(
     '/users/<int:user_id>/role',
-    view_func=UserRoleAPI.as_view('user_role_api'),
-    methods=['PATCH']
+    view_func=UserRoleAPI.as_view('user_role_api')
 )
 
 app.add_url_rule(
     '/stats',
-    view_func=StatsAPI.as_view('stats_api'),
-    methods=['GET']
+    view_func=StatsAPI.as_view('stats_api')
 )
 
 
