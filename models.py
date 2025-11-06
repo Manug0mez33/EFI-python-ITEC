@@ -68,7 +68,7 @@ class Comment(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     post = db.relationship(
         'Post',
-        backref='comments',
+        backref=db.backref('comments', lazy='dynamic'),
         lazy=True
     )
     user = db.relationship(
@@ -81,6 +81,8 @@ class Comment(db.Model):
 class Category(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
+    is_visible = db.Column(db.Boolean, default=True)
+
 
     def __str__(self):
         return self.name

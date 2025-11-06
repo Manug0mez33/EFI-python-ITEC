@@ -132,7 +132,7 @@ class PostAPI(MethodView):
         author_username = request.args.get('author_username', type=str)
         category_name = request.args.get('category_name', type=str)
 
-        query = Post.query
+        query = Post.query.filter_by(is_published=True)
 
         if author_username:
             query = query.join(User).filter(User.username == author_username)
@@ -180,7 +180,7 @@ class PostAPI(MethodView):
     
 class PostDetailAPI(MethodView):
     def get(self, post_id):
-        post = Post.query.get_or_404(post_id)
+        post = Post.query.filter_by(post_id, is_published=True).first_or_404()
         return PostSchema().dump(post), 200
     
     @jwt_required()
@@ -188,7 +188,7 @@ class PostDetailAPI(MethodView):
         post = Post.query.get_or_404(post_id)
         if not is_admin_or_owner(post.user_id):
             return {'error': 'Acceso denegado: permisos insuficientes'}, 403
-        db.session.delete(post)
+        post.is_published = False
         db.session.commit()
         return {'message': 'Post deleted'}, 200
     
@@ -218,14 +218,15 @@ class CommentAPI(MethodView):
         if (not is_admin_or_owner(comment.user_id)) and (current_user_role != 'moderator'):
             return {'error': 'Acceso denegado: permisos insuficientes'}, 403
         else:
-            db.session.delete(comment)
+            comment.is_visible = False
             db.session.commit()
             return {'message': 'Comment deleted'}, 200
 
 class CommentListAPI(MethodView):
     def get(self, post_id):
         post = Post.query.get_or_404(post_id)
-        return CommentSchema(many=True).dump(post.comments), 200
+        visible_comments = post.comments.filter_by(is_visible=True)
+        return CommentSchema(many=True).dump(visible_comments), 200
     
     @limiter.limit('30 per hour', key_func=get_user_identity_from_jwt)
     @jwt_required()
@@ -249,7 +250,7 @@ class CommentListAPI(MethodView):
     
 class CategoryAPI(MethodView):
     def get(self):
-        categories = Category.query.all()
+        categories = Category.query.filter_by(is_visible=True).all()
         return CategorySchema(many=True).dump(categories), 200
     
     @jwt_required()
@@ -292,7 +293,7 @@ class CategoryDetailAPI(MethodView):
     @role_required('admin')
     def delete(self, category_id):
         category = Category.query.get_or_404(category_id)
-        db.session.delete(category)
+        category.is_visible = False
         db.session.commit()
         return {'message': 'Category deleted'}, 200
     
@@ -300,7 +301,7 @@ class UserAPI(MethodView):
     @jwt_required()
     @role_required('admin')
     def get(self):
-        users = User.query.all()
+        users = User.query.filter_by(is_active=True).all()
         return UserSchema(many=True).dump(users), 200
     
 class UserDetailAPI(MethodView):
