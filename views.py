@@ -125,7 +125,20 @@ class PostAPI(MethodView):
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
 
-        paginated_posts = Post.query.order_by(Post.date_created.desc()).paginate(
+        author_username = request.args.get('author_username', type=str)
+        category_name = request.args.get('category_name', type=str)
+
+        query = Post.query
+
+        if author_username:
+            query = query.join(User).filter(User.username == author_username)
+
+        if category_name:
+            query = query.filter(Post.categories.any(name=category_name)) 
+
+        query = query.order_by(Post.date_created.desc())
+
+        paginated_posts = query.paginate(
             page=page,
             per_page=per_page,
             error_out=False
