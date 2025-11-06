@@ -122,9 +122,27 @@ class RefreshAPI(MethodView):
 
 class PostAPI(MethodView):
     def get(self):
-        posts = Post.query.order_by(Post.date_created.desc()).all()
-        return PostSchema(many=True).dump(posts), 200
-    
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+
+        paginated_posts = Post.query.order_by(Post.date_created.desc()).paginate(
+            page=page,
+            per_page=per_page,
+            error_out=False
+        )
+
+        return jsonify({
+            'posts': PostSchema(many=True).dump(paginated_posts.items),
+            'pagination': {
+                'total_pages': paginated_posts.pages,
+                'total_items': paginated_posts.total,
+                'current_page': paginated_posts.page,
+                'per_page': paginated_posts.per_page,
+                'has_next': paginated_posts.has_next,
+                'has_prev': paginated_posts.has_prev
+            }
+        }), 200
+
     @jwt_required()
     def post(self):
         current_user = get_jwt_identity()

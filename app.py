@@ -42,7 +42,7 @@ app.add_url_rule(
 app.add_url_rule(
     '/post',
     view_func=PostAPI.as_view('post_api'), 
-
+    methods=['POST', 'GET']
 )
 
 app.add_url_rule(
