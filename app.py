@@ -2,7 +2,8 @@ from datetime import timedelta
 from flask import Flask, jsonify
 from flask_jwt_extended import JWTManager
 from flask_migrate import Migrate
-
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 app = Flask(__name__)
 
 
@@ -13,6 +14,13 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = 'clave-ultra-secreta'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=15)
 app.config['JWT_REFRESH_TOKEN_EXPIRES'] = timedelta(hours=24)
+
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    storage_uri="memory://",
+    default_limits=["200 per day", "50 per hour"]
+)
 
 from models import db
 from views import UserRegisterAPI, PostAPI, LoginAPI, PostDetailAPI, CategoryAPI, CategoryDetailAPI, CommentListAPI, CommentAPI, UserAPI, UserDetailAPI, UserRoleAPI, StatsAPI, RefreshAPI

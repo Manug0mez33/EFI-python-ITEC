@@ -16,7 +16,10 @@ from functools import wraps
 from typing import Any, Dict
 from schemas import UserSchema, RegisterSchema, LoginSchema, PostSchema, CommentSchema, CategorySchema, RoleUpdateSchema
 from models import User, UserCredentials, Post, Comment, Category
-from app import db
+from app import db, limiter
+
+def get_user_identity_from_jwt():
+    return int(get_jwt_identity())
 
 def role_required(*allowed_roles: str):
     def decorator(fn):
@@ -71,6 +74,7 @@ class UserRegisterAPI(MethodView):
         return {'message': 'Usuario registrado exitosamente'}, 201
 
 class LoginAPI(MethodView):
+    @limiter.limit('10 per hour')
     def post(self):
         try:
             data = LoginSchema().load(request.json)
@@ -156,6 +160,7 @@ class PostAPI(MethodView):
             }
         }), 200
 
+    @limiter.limit('10 per hour', key_func=get_user_identity_from_jwt)
     @jwt_required()
     def post(self):
         current_user = get_jwt_identity()
@@ -222,6 +227,7 @@ class CommentListAPI(MethodView):
         post = Post.query.get_or_404(post_id)
         return CommentSchema(many=True).dump(post.comments), 200
     
+    @limiter.limit('30 per hour', key_func=get_user_identity_from_jwt)
     @jwt_required()
     def post(self, post_id):
         Post.query.get_or_404(post_id)
