@@ -19,7 +19,12 @@ from models import User, UserCredentials, Post, Comment, Category
 from app import db, limiter
 
 def get_user_identity_from_jwt():
-    return int(get_jwt_identity())
+    try:
+        identity = get_jwt_identity()
+        return int(identity) if identity else None
+    except RuntimeError:
+        # No JWT present, return None to use default rate limiting
+        return None
 
 def role_required(*allowed_roles: str):
     def decorator(fn):
@@ -71,7 +76,12 @@ class UserRegisterAPI(MethodView):
         )
         db.session.add(credentials)
         db.session.commit()
-        return {'message': 'Usuario registrado exitosamente'}, 201
+        
+        new_user.credential = credentials
+        return {
+            'message': 'Usuario registrado exitosamente',
+            'user': UserSchema().dump(new_user)
+        }, 201
 
 class LoginAPI(MethodView):
     @limiter.limit('10 per hour')

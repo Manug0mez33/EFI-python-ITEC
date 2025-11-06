@@ -1,17 +1,20 @@
 import pytest
-from app import app as main_app 
-from app import db as main_db
-from models import User, UserCredentials  
-from werkzeug.security import generate_password_hash  
+from app import create_app
+from models import db as main_db
+from models import User, UserCredentials, Post, Comment, Category, post_categories
+from werkzeug.security import generate_password_hash
+from flask_jwt_extended import JWTManager
 
 @pytest.fixture(scope='session')
 def app():
     """Configura la app de Flask para pruebas."""
-    main_app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://manu:1234@localhost/EFI_test'
-    main_app.config['TESTING'] = True  
-    main_app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 30  
+    # Llama a la fábrica con la config de 'testing'
+    app = create_app('testing')
     
-    yield main_app
+    # Initialize JWTManager for the test app
+    JWTManager(app)
+    
+    yield app
 
 @pytest.fixture(scope='session')
 def db(app):
@@ -23,26 +26,28 @@ def db(app):
         main_db.drop_all()  # Limpia la base de datos
 
 @pytest.fixture(scope='function')
-def session(db):
+def session(db, app):
     """Crea una sesión limpia para cada test."""
-    connection = db.engine.connect()
-    transaction = connection.begin()
-    
-    options = dict(bind=connection, binds={})
-    session = db.create_scoped_session(options=options)
-    
-    db.session = session
+    with app.app_context():
+        # Clean up any existing data from previous tests in correct order (respecting foreign keys)
+        db.session.execute(post_categories.delete())
+        db.session.query(Comment).delete()
+        db.session.query(Post).delete()
+        db.session.query(Category).delete()
+        db.session.query(UserCredentials).delete()
+        db.session.query(User).delete()
+        db.session.commit()
+        
+        yield db.session
+        
+        # Rollback any uncommitted changes
+        db.session.rollback()
 
-    yield session
-
-    transaction.rollback()
-    connection.close()
-    session.remove()
-
-@pytest.fixture(scope='session')
-def client(app):
+@pytest.fixture(scope='function')
+def client(app, session):
     """Un cliente de prueba para hacer peticiones a la API."""
-    return app.test_client()
+    with app.app_context():
+        yield app.test_client()
 
 @pytest.fixture(scope='function')
 def normal_user(session):
@@ -73,6 +78,24 @@ def admin_user(session):
         user_id=user.id,
         password_hash=generate_password_hash('password123'),
         role='admin'
+    )
+    session.add(cred)
+    session.commit()
+
+    user.credential = cred
+    return user
+
+@pytest.fixture(scope='function')
+def moderator_user(session):
+    """Crea un usuario con rol 'moderator' en la DB."""
+    user = User(username='moderatoruser', email='moderator@user.com')
+    session.add(user)
+    session.commit()
+    
+    cred = UserCredentials(
+        user_id=user.id,
+        password_hash=generate_password_hash('password123'),
+        role='moderator'
     )
     session.add(cred)
     session.commit()

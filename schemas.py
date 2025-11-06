@@ -25,6 +25,7 @@ class PostSchema(Schema):
     content = fields.Str(required=True)
     date_created = fields.DateTime(dump_only=True)
     user_id = fields.Int(load_only=True)
+    user = fields.Nested(UserSchema, dump_only=True)
     categories = fields.List(fields.Int(), load_only=True)
 
 class CommentSchema(Schema):
