@@ -24,6 +24,7 @@ class PostSchema(Schema):
     title = fields.Str(required=True)
     content = fields.Str(required=True)
     date_created = fields.DateTime(dump_only=True)
+    user = fields.Nested(UserSchema(only=('id', 'username')))
     user_id = fields.Int(load_only=True)
     categories = fields.List(fields.Int(), load_only=True)
 
@@ -32,6 +33,7 @@ class CommentSchema(Schema):
     content = fields.Str(required=True)
     date_created = fields.DateTime(dump_only=True)
     post_id = fields.Int(load_only=True)
+    user = fields.Nested(UserSchema(only=('id', 'username')))
 
 class CategorySchema(Schema):
     id = fields.Int(dump_only=True)
