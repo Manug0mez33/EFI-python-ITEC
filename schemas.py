@@ -39,3 +39,12 @@ class CategorySchema(Schema):
 
 class RoleUpdateSchema(Schema):
     role = fields.Str(required=True, validate=validate.OneOf(['admin', 'user', 'moderator']))
+
+class NotificationSchema(Schema):
+    id = fields.Int(dump_only=True)
+    message = fields.Str(dump_only=True)
+    is_read = fields.Bool(dump_only=True)
+    time = fields.DateTime(dump_only=True)
+    post_id = fields.Int(dump_only=True)
+
+    actor = fields.Nested(UserSchema(only=('id', 'username')))

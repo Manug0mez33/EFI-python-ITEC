@@ -23,7 +23,23 @@ limiter = Limiter(
 )
 
 from models import db
-from views import UserRegisterAPI, PostAPI, LoginAPI, PostDetailAPI, CategoryAPI, CategoryDetailAPI, CommentListAPI, CommentAPI, UserAPI, UserDetailAPI, UserRoleAPI, StatsAPI, RefreshAPI
+from views import (
+    UserRegisterAPI, 
+    PostAPI, 
+    LoginAPI, 
+    PostDetailAPI, 
+    CategoryAPI, 
+    CategoryDetailAPI, 
+    CommentListAPI, 
+    CommentAPI, 
+    UserAPI, 
+    UserDetailAPI, 
+    UserRoleAPI, 
+    StatsAPI, 
+    RefreshAPI,
+    NotificationAPI,
+    NotificationReadAPI
+)
 
 jwt = JWTManager(app)
 db.init_app(app)
@@ -63,6 +79,17 @@ app.add_url_rule(
     '/comments/<int:comment_id>',
     view_func=CommentAPI.as_view('comment_api')
 )
+
+app.add_url_rule(
+    '/notifications',
+    view_func=NotificationAPI.as_view('notification_api')
+)
+
+app.add_url_rule(
+    '/notifications/<int:notification_id>/read',
+    view_func=NotificationReadAPI.as_view('notification_read_api')
+)
+
 
 app.add_url_rule(
     '/category',

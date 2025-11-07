@@ -14,8 +14,8 @@ from flask_login import current_user
 
 from functools import wraps
 from typing import Any, Dict
-from schemas import UserSchema, RegisterSchema, LoginSchema, PostSchema, CommentSchema, CategorySchema, RoleUpdateSchema
-from models import User, UserCredentials, Post, Comment, Category
+from schemas import UserSchema, RegisterSchema, LoginSchema, PostSchema, CommentSchema, CategorySchema, RoleUpdateSchema, NotificationSchema
+from models import User, UserCredentials, Post, Comment, Category, Notification
 from app import db, limiter
 
 def get_user_identity_from_jwt():
@@ -231,8 +231,8 @@ class CommentListAPI(MethodView):
     @limiter.limit('30 per hour', key_func=get_user_identity_from_jwt)
     @jwt_required()
     def post(self, post_id):
-        Post.query.get_or_404(post_id)
-        current_user = get_jwt_identity()
+        post = Post.query.get_or_404(post_id)
+        current_user = int(get_jwt_identity())
 
         try:
             data = CommentSchema().load(request.json)
@@ -241,13 +241,45 @@ class CommentListAPI(MethodView):
         
         new_comment = Comment(
             content=data['content'],
-            post_id=post_id,
-            user_id=int(current_user)
+            post_id=post.id,
+            user_id=current_user
         )
         db.session.add(new_comment)
         db.session.commit()
+
+        if post.user_id != current_user:
+            actor = User.query.get(current_user)
+            notification = Notification(
+                user_id=post.user_id,
+                actor_id=current_user,
+                post_id=post.id,
+                message=f'{actor.username} ha comentado en tu publicación.'
+            )
+            db.session.add(notification)
+            db.session.commit()
+
         return CommentSchema().dump(new_comment), 201
     
+class NotificationAPI(MethodView):
+    @jwt_required()
+    def get(self):
+        user_id = int(get_jwt_identity())
+        notifications = Notification.query.filter_by(user_id=user_id).order_by(Notification.time.desc()).all()
+        return NotificationSchema(many=True).dump(notifications), 200
+    
+class NotificationReadAPI(MethodView):
+    @jwt_required()
+    def patch(self, notification_id):
+        user_id = int(get_jwt_identity())
+        notification = Notification.query.get_or_404(notification_id)
+
+        if notification.user_id != user_id:
+            return {'error': 'Acceso denegado: permisos insuficientes'}, 403
+        
+        notification.is_read = True
+        db.session.commit()
+        return {'message': 'Notification read'}, 200
+        
 class CategoryAPI(MethodView):
     def get(self):
         categories = Category.query.filter_by(is_visible=True).all()
@@ -312,7 +344,6 @@ class UserDetailAPI(MethodView):
         user = User.query.get_or_404(user_id)
         return UserSchema().dump(user), 200
        
-
     @jwt_required()
     @role_required('admin')
     def delete(self, user_id):

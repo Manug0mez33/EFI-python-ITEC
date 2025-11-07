@@ -83,6 +83,19 @@ class Category(db.Model):
     name = db.Column(db.String(100), unique=True, nullable=False)
     is_visible = db.Column(db.Boolean, default=True)
 
+class Notification(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    actor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    post_id = db.Column(db.Integer, db.ForeignKey('post.id'), nullable=False)
 
-    def __str__(self):
-        return self.name
+    message = db.Column(db.String(255), nullable=False)
+    is_read = db.Column(db.Boolean, default=False)
+    time = db.Column(db.DateTime, default=db.func.now())
+
+    user = db.relationship('User', foreign_keys=[user_id], backref=db.backref('notifications', lazy='dynamic'))
+    actor = db.relationship('User', foreign_keys=[actor_id])
+    post = db.relationship('Post', foreign_keys=[post_id])
+
+    def __repr__(self):
+        return f'Notification {self.id} {self.message}'
