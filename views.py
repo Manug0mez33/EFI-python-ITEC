@@ -13,7 +13,6 @@ from flask_jwt_extended import (
 from flask_login import current_user
 
 from functools import wraps
-from typing import Any, Dict
 from schemas import UserSchema, RegisterSchema, LoginSchema, PostSchema, CommentSchema, CategorySchema, RoleUpdateSchema, NotificationSchema
 from models import User, UserCredentials, Post, Comment, Category, Notification
 from app import db, limiter
@@ -160,8 +159,8 @@ class PostAPI(MethodView):
             }
         }), 200
 
-    @limiter.limit('10 per hour', key_func=get_user_identity_from_jwt)
     @jwt_required()
+    @limiter.limit('10 per hour', key_func=get_user_identity_from_jwt)
     def post(self):
         current_user = get_jwt_identity()
         try:
@@ -228,8 +227,8 @@ class CommentListAPI(MethodView):
         visible_comments = post.comments.filter_by(is_visible=True)
         return CommentSchema(many=True).dump(visible_comments), 200
     
-    @limiter.limit('30 per hour', key_func=get_user_identity_from_jwt)
     @jwt_required()
+    @limiter.limit('30 per hour', key_func=get_user_identity_from_jwt)
     def post(self, post_id):
         post = Post.query.get_or_404(post_id)
         current_user = int(get_jwt_identity())

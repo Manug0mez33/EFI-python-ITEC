@@ -4,8 +4,14 @@ from flask_jwt_extended import JWTManager
 from flask_migrate import Migrate
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_cors import CORS
+
 app = Flask(__name__)
 
+CORS(app,
+     origins=['http://localhost:5173'],
+     supports_credentials=True
+     )
 
 app.config['SQLALCHEMY_DATABASE_URI'] = (
     'mysql+pymysql://root:@localhost/EFI'
@@ -89,7 +95,6 @@ app.add_url_rule(
     '/notifications/<int:notification_id>/read',
     view_func=NotificationReadAPI.as_view('notification_read_api')
 )
-
 
 app.add_url_rule(
     '/category',
