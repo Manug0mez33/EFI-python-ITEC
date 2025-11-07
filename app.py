@@ -4,7 +4,36 @@ from flask_jwt_extended import JWTManager
 from flask_migrate import Migrate
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flasgger import Swagger
+
 app = Flask(__name__)
+
+swagger = Swagger(app)
+
+from schemas import UserSchema, RegisterSchema, LoginSchema, PostSchema, CommentSchema, CategorySchema, RoleUpdateSchema, NotificationSchema
+
+app.config['SWAGGER'] = {
+    'title': 'API de MiniBlog',
+    'uiversion': 2,
+    'specs': [
+        {
+            'endpoint': 'apispec_1',
+            'route': '/apispec_1.json',
+            'rule_filter': lambda rule: True,
+            'model_filter': lambda tag: True,
+        }
+    ],
+    'definitions': {
+        'Register': RegisterSchema,
+        'Login': LoginSchema,
+        'Post': PostSchema,
+        'Comment': CommentSchema,
+        'Category': CategorySchema,
+        'RoleUpdate': RoleUpdateSchema,
+        'Notification': NotificationSchema,
+        'User': UserSchema
+    }
+}
 
 
 app.config['SQLALCHEMY_DATABASE_URI'] = (
