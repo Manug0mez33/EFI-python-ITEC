@@ -13,7 +13,7 @@ from flask_jwt_extended import (
 from flask_login import current_user
 
 from functools import wraps
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, subqueryload
 from schemas import UserSchema, RegisterSchema, LoginSchema, PostSchema, CommentSchema, CategorySchema, RoleUpdateSchema, NotificationSchema
 from models import User, UserCredentials, Post, Comment, Category, Notification
 from app import db, limiter
@@ -132,14 +132,11 @@ class PostAPI(MethodView):
         author_username = request.args.get('author_username', type=str)
         category_name = request.args.get('category_name', type=str)
 
-        query = Post.query
-
-        query = query.options(
+        query = Post.query.options(
             joinedload(Post.user),
-            joinedload(Post.comments).joinedload(Comment.user)
-        )
 
-        query = Post.query.filter_by(is_published=True)
+            joinedload(Post.categories)
+        ).filter_by(is_published=True)
 
         if author_username:
             query = query.join(User).filter(User.username == author_username)
@@ -176,13 +173,25 @@ class PostAPI(MethodView):
         except ValidationError as err:
             return {'errors': err.messages}, 400
 
+        category_ids = data.pop('categories', [])
+        
         new_post = Post(
             title=data['title'],
             content=data['content'],
             user_id=int(current_user)
         )
-        db.session.add(new_post)
-        db.session.commit()
+
+        if category_ids:
+            categories_to_add = Category.query.filter(Category.id.in_(category_ids)).all()
+            new_post.categories.extend(categories_to_add)
+
+        try:
+            db.session.add(new_post)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            return {'error': str(e)}, 500
+
         return PostSchema().dump(new_post), 201
     
 class PostDetailAPI(MethodView):
@@ -307,12 +316,8 @@ class CategoryAPI(MethodView):
         db.session.add(new_category)
         db.session.commit()
 
-        return jsonify({
-            'success': True,
-            'category': {
-                'name': data['name']
-            }
-        })
+        return CategorySchema().dump(new_category), 201
+    
 
 class CategoryDetailAPI(MethodView):
     @jwt_required()

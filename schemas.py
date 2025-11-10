@@ -28,6 +28,11 @@ class CommentSchema(Schema):
     post_id = fields.Int(load_only=True)
     user = fields.Nested(UserSchema(only=('id', 'username')), dump_only=True)
 
+class CategorySchema(Schema):
+    id = fields.Int(dump_only=True)
+    name = fields.Str(required=True)
+    is_visible = fields.Bool(dump_only=True)
+
 class PostSchema(Schema):
     id = fields.Int(dump_only=True)
     title = fields.Str(required=True)
@@ -37,10 +42,12 @@ class PostSchema(Schema):
     comments = fields.Nested(CommentSchema(many=True), dump_only=True)
     user_id = fields.Int(load_only=True)
     categories = fields.List(fields.Int(), load_only=True)
+    categories_data = fields.Nested(
+        CategorySchema(many=True), 
+        dump_only=True, 
+        attribute="categories"
+    )
 
-class CategorySchema(Schema):
-    id = fields.Int(dump_only=True)
-    name = fields.Str(required=True)
 
 class RoleUpdateSchema(Schema):
     role = fields.Str(required=True, validate=validate.OneOf(['admin', 'user', 'moderator']))
