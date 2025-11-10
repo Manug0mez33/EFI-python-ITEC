@@ -13,6 +13,7 @@ from flask_jwt_extended import (
 from flask_login import current_user
 
 from functools import wraps
+from sqlalchemy.orm import joinedload
 from schemas import UserSchema, RegisterSchema, LoginSchema, PostSchema, CommentSchema, CategorySchema, RoleUpdateSchema, NotificationSchema
 from models import User, UserCredentials, Post, Comment, Category, Notification
 from app import db, limiter
@@ -130,6 +131,13 @@ class PostAPI(MethodView):
 
         author_username = request.args.get('author_username', type=str)
         category_name = request.args.get('category_name', type=str)
+
+        query = Post.query
+
+        query = query.options(
+            joinedload(Post.user),
+            joinedload(Post.comments).joinedload(Comment.user)
+        )
 
         query = Post.query.filter_by(is_published=True)
 
@@ -332,7 +340,9 @@ class UserAPI(MethodView):
     @jwt_required()
     @role_required('admin')
     def get(self):
-        users = User.query.filter_by(is_active=True).all()
+        users = User.query.options(
+            joinedload(User.credential)
+        ).all()
         return UserSchema(many=True).dump(users), 200
     
 class UserDetailAPI(MethodView):
