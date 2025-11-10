@@ -40,7 +40,8 @@ from views import (
     CommentAPI, 
     UserAPI, 
     UserDetailAPI, 
-    UserRoleAPI, 
+    UserRoleAPI,
+    UserStatusAPI, 
     StatsAPI, 
     RefreshAPI,
     NotificationAPI,
@@ -119,6 +120,11 @@ app.add_url_rule(
 app.add_url_rule(
     '/users/<int:user_id>/role',
     view_func=UserRoleAPI.as_view('user_role_api')
+)
+
+app.add_url_rule (
+    '/users/<int:user_id>/status',
+    view_func=UserStatusAPI.as_view('user_status_api')
 )
 
 app.add_url_rule(

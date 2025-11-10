@@ -375,6 +375,21 @@ class UserRoleAPI(MethodView):
         db.session.commit()
         return {'message': 'Rol de usuario actualizado'}, 200
     
+class UserStatusAPI(MethodView):
+    @jwt_required()
+    @role_required('admin')
+    def patch(self, user_id):
+        try:
+            data = UserSchema(partial=True).load(request.json)
+        except ValidationError as err:
+            return {'errors': err.messages}, 400
+
+        user = User.query.get_or_404(user_id)
+        user.is_active = data['is_active']
+        db.session.commit()
+        return jsonify({'message': 'Estado de usuario actualizado'}), 200
+
+
 class StatsAPI(MethodView):
     @jwt_required()
     @role_required('admin', 'moderator')
