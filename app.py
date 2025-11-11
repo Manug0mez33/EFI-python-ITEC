@@ -43,9 +43,7 @@ from views import (
     UserRoleAPI,
     UserStatusAPI, 
     StatsAPI, 
-    RefreshAPI,
-    NotificationAPI,
-    NotificationReadAPI
+    RefreshAPI
 )
 
 jwt = JWTManager(app)
@@ -88,16 +86,6 @@ app.add_url_rule(
 )
 
 app.add_url_rule(
-    '/notifications',
-    view_func=NotificationAPI.as_view('notification_api')
-)
-
-app.add_url_rule(
-    '/notifications/<int:notification_id>/read',
-    view_func=NotificationReadAPI.as_view('notification_read_api')
-)
-
-app.add_url_rule(
     '/category',
     view_func=CategoryAPI.as_view('category_api')
 )
@@ -132,7 +120,6 @@ app.add_url_rule(
     view_func=StatsAPI.as_view('stats_api')
 )
 
-
 @app.route('/')
 def index():
     return jsonify({
@@ -140,7 +127,6 @@ def index():
         "status": "ok",
         "version": "1.0.0"
     }), 200
-
 
 @app.cli.command("seed-db")
 def seed_db():

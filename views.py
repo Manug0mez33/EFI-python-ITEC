@@ -295,27 +295,7 @@ class CommentListAPI(MethodView):
             db.session.commit()
 
         return CommentSchema().dump(new_comment), 201
-    
-class NotificationAPI(MethodView):
-    @jwt_required()
-    def get(self):
-        user_id = int(get_jwt_identity())
-        notifications = Notification.query.filter_by(user_id=user_id).order_by(Notification.time.desc()).all()
-        return NotificationSchema(many=True).dump(notifications), 200
-    
-class NotificationReadAPI(MethodView):
-    @jwt_required()
-    def patch(self, notification_id):
-        user_id = int(get_jwt_identity())
-        notification = Notification.query.get_or_404(notification_id)
-
-        if notification.user_id != user_id:
-            return {'error': 'Acceso denegado: permisos insuficientes'}, 403
-        
-        notification.is_read = True
-        db.session.commit()
-        return {'message': 'Notification read'}, 200
-        
+          
 class CategoryAPI(MethodView):
     def get(self):
         categories = Category.query.filter_by(is_visible=True).all()

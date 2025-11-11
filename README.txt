@@ -13,3 +13,17 @@ Instrucciones de instalacion:
     9. flask run --reload
 
 Archivo de prueba: test.http (Recomendada la extension REST Client para un mejor manejo)
+
+Comentarios:
+
+    - Documentacion Swagger/OpenAPI, Tests con cobertura>70%, y Arquitectura service-repository hechos con IA, por lo que quedaron en ramas separadas a la main para no afectar al trabajo hecho por nosotros. (documentationSwagger, testing, service-repository-test).
+
+    - Previamente habiamos implementado APIs para la gestion de notificaciones, pero fueron descartadas por fallas en la funcionalidad.
+
+    - Actualizamos algunos modelos y esquemas para una correcta fusion con el frontend hecho con React, a medida que se requeria, al igual que agregamos algunas APIs como por ejemplo UserStatusAPI, con el metodo PATCH para poder reactivar un usuario (solo siendo admin).
+
+    - Agregamos al archivo app.py un decorador para ejecutar el comando "seed-db", para luego ejecutarlo por terminal con flask seed-db, asi se crearan tres usuarios de prueba, uno por cada rol.
+
+Alumnos:
+    - Falco, Juan
+    - Gomez, Manuel
