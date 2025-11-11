@@ -196,7 +196,7 @@ class PostAPI(MethodView):
     
 class PostDetailAPI(MethodView):
     def get(self, post_id):
-        post = Post.query.filter_by(post_id, is_published=True).first_or_404()
+        post = Post.query.filter_by(id=post_id, is_published=True).first_or_404()
         return PostSchema().dump(post), 200
     
     @jwt_required()
@@ -225,6 +225,26 @@ class PostDetailAPI(MethodView):
 
     
 class CommentAPI(MethodView):
+    @jwt_required()
+    def put(self, comment_id):
+        comment = Comment.query.get_or_404(comment_id)
+
+        if not is_admin_or_owner(comment.user_id):
+            return {'error': 'Acceso denegado: permisos insuficientes'}, 403
+        
+        try:
+            data = CommentSchema(partial=True).load(request.json)
+        except ValidationError as err:
+            return {'errors': err.messages}, 400
+
+        if 'content' not in data:
+            return {'errors': 'El contenido es requerido'}, 400
+
+        comment.content = data['content']
+        db.session.commit()
+        return CommentSchema().dump(comment), 200
+    
+
     @jwt_required()
     def delete(self, comment_id):
         comment = Comment.query.get_or_404(comment_id)

@@ -1,0 +1,194 @@
+###
+# 1. Registrar un usuario.
+# 2. Hacer login para obtener los tokens.
+# 3. Copiar el access_token y refresh_token en las variables de abajo.
+# 4. Ejecutar el resto de las peticiones.
+###
+
+# Variables - Reemplaza los tokens después de hacer login
+@host = http://127.0.0.1:5000
+@access_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+@refresh_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+###
+# Endpoint Raíz (Health Check)
+###
+GET {{host}}/
+
+###
+# --- Autenticación ---
+###
+
+# @name register
+# Registrar un nuevo usuario
+POST {{host}}/register
+Content-Type: application/json
+Accept: application/json
+
+{
+   "username": "testuser4",
+   "email": "test4@example.com",
+   "password": "password123",
+   "role": "admin"
+}
+
+###
+# @name login
+# Iniciar sesión para obtener tokens
+POST {{host}}/login
+Content-Type: application/json
+Accept: application/json
+
+{
+   "email": "test3@example.com",
+   "password": "password123"
+}
+
+###
+# @name refresh
+# Refrescar el token de acceso
+POST {{host}}/refresh
+Authorization: Bearer {{refresh_token}}
+
+###
+# --- Usuarios ---
+# (Requieren autenticación y, a menudo, rol de administrador)
+###
+
+# Obtener lista de usuarios
+GET {{host}}/users
+Authorization: Bearer {{access_token}}
+
+###
+# Obtener un usuario específico
+GET {{host}}/users/1
+Authorization: Bearer {{access_token}}
+
+###
+# Actualizar rol de un usuario (solo admin)
+PATCH {{host}}/users/1/role
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+   "role": "admin"
+}
+
+###
+# Actualizar estado de un usuario (solo admin)
+PATCH {{host}}/users/1/status
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+   "is_active": false
+}
+
+###
+# --- Categorías ---
+###
+
+# Crear una nueva categoría
+POST {{host}}/category
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+   "name": "Tecnología"
+}
+
+###
+# Obtener todas las categorías
+GET {{host}}/category
+
+###
+PUT {{host}}/category/1
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+   "name": "Desarrollo Web"
+}
+
+###
+DELETE {{host}}/category/1
+Authorization: Bearer {{access_token}}
+
+###
+# --- Posts ---
+###
+
+# Crear un nuevo post
+POST {{host}}/post
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+   "title": "Mi primer post desde tests.http",
+   "content": "Este es el contenido del post."
+}
+
+###
+# Obtener todos los posts
+GET {{host}}/post
+
+###
+# Obtener un post específico
+GET {{host}}/post/1
+
+###
+# Actualizar un post (solo el autor o admin)
+PUT {{host}}/post/1
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+   "title": "Título actualizado",
+   "content": "Contenido actualizado."
+}
+
+###
+# Borrar un post (solo el autor o admin)
+DELETE {{host}}/post/1
+Authorization: Bearer {{access_token}}
+
+###
+# --- Comentarios ---
+###
+
+# Crear un comentario en un post
+POST {{host}}/post/1/comments
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+   "content": "Que buen post!"
+}
+
+###
+# Obtener comentarios de un post
+GET {{host}}/post/1/comments
+
+###
+# Actualizar un comentario (solo autor o admin)
+PUT {{host}}/comments/1
+Authorization: Bearer {{access_token}}
+Content-Type: application/json
+
+{
+   "content": "Editando mi comentario."
+}
+
+###
+# Borrar un comentario (solo autor o admin)
+DELETE {{host}}/comments/1
+Authorization: Bearer {{access_token}}
+
+###
+# --- Estadísticas ---
+###
+
+# Obtener estadísticas (solo admin)
+GET {{host}}/stats
+Authorization: Bearer {{access_token}}
+

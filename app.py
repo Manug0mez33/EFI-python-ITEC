@@ -142,5 +142,56 @@ def index():
     }), 200
 
 
+@app.cli.command("seed-db")
+def seed_db():
+    """Crea datos de prueba en la base de datos (1 usuario por rol)."""
+    from models import User, UserCredentials
+    from werkzeug.security import generate_password_hash
+
+    test_users = [
+        {
+            "username": "admin",
+            "email": "admin@admin",
+            "password": "1234",
+            "role": "admin"
+        },
+        {
+            "username": "moderator",
+            "email": "moderator@moderator",
+            "password": "1234",
+            "role": "moderator"
+        },
+        {
+            "username": "user",
+            "email": "user@user",
+            "password": "1234",
+            "role": "user"
+        }
+    ]
+
+    print("Creando usuarios de prueba...")
+    for user_data in test_users:
+        user = User.query.filter_by(email=user_data["email"]).first()
+        if user:
+            print(f"El usuario {user_data['email']} ya existe.")
+            continue
+
+        new_user = User(
+            username=user_data['username'],
+            email=user_data['email'],
+            is_active=True
+        )
+        db.session.add(new_user)
+        db.session.flush()
+
+        password_hash = generate_password_hash(user_data['password'], method='pbkdf2:sha256')
+        credentials = UserCredentials(user_id=new_user.id, password_hash=password_hash, role=user_data['role'])
+        db.session.add(credentials)
+        print(f"Usuario {user_data['username']} ({user_data['role']}) creado.")
+    
+    db.session.commit()
+    print("Datos de prueba creados con exito.")
+
+
 if __name__ == '__main__':
     app.run(debug=True)
