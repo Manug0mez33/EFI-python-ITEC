@@ -204,6 +204,12 @@ class PostDetailAPI(MethodView):
         post = Post.query.get_or_404(post_id)
         if not is_admin_or_owner(post.user_id):
             return {'error': 'Acceso denegado: permisos insuficientes'}, 403
+        
+        post.comments.update(
+            {Comment.is_visible: False},
+            synchronize_session=False
+        )
+
         post.is_published = False
         db.session.commit()
         return {'message': 'Post deleted'}, 200
@@ -409,11 +415,12 @@ class StatsAPI(MethodView):
     @jwt_required()
     @role_required('admin', 'moderator')
     def get(self):
-        total_posts = Post.query.count()
-        total_comments = Comment.query.count()
-        total_users = User.query.count()
+        total_posts = Post.query.filter_by(is_published=True).count()
+        total_comments = Comment.query.filter_by(is_visible=True).count()
+        total_users = User.query.filter_by(is_active=True).count()
         post_last_week = Post.query.filter(
-            Post.date_created >= db.func.now() - db.text('INTERVAL 7 DAY')
+            Post.date_created >= db.func.now() - db.text('INTERVAL 7 DAY'),
+            Post.is_published == True
         ).count()
 
         stats = {
