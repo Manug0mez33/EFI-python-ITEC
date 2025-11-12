@@ -70,8 +70,22 @@ class UserRegisterAPI(MethodView):
             role=data['role']
         )
         db.session.add(credentials)
+
+        additional_claims = {
+            'email': new_user.email,
+            'role': credentials.role,
+            'username': new_user.username
+        }
+
+        identity = str(new_user.id)
+        access_token = create_access_token(
+            identity=identity,
+            additional_claims=additional_claims
+        )
+
         db.session.commit()
-        return {'message': 'Usuario registrado exitosamente'}, 201
+        return jsonify(access_token=access_token), 201
+    
 
 class LoginAPI(MethodView):
     @limiter.limit('10 per hour')
