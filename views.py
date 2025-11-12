@@ -218,8 +218,18 @@ class PostDetailAPI(MethodView):
 
         if not is_admin_or_owner(post.user_id):
             return {'error': 'Acceso denegado: permisos insuficientes'}, 403
+        
+        category_ids = data.pop('categories', [])
+
         post.title = data['title']
         post.content = data['content']
+
+        if category_ids:
+            categories_to_add = Category.query.filter(Category.id.in_(category_ids)).all()
+            post.categories = categories_to_add
+        else:
+            post.categories = []
+            
         db.session.commit()
         return PostSchema().dump(post), 200
 
