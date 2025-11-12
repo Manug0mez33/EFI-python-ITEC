@@ -1,7 +1,7 @@
 from marshmallow import Schema, fields
 from marshmallow import validate
 from app import db
-from models import User
+from models import User, Comment
 
 class UserSchema(Schema):
     id = fields.Int(dump_only=True)
@@ -39,7 +39,7 @@ class PostSchema(Schema):
     content = fields.Str(required=True)
     date_created = fields.DateTime(dump_only=True)
     user = fields.Nested(UserSchema(only=('id', 'username')), dump_only=True)
-    comments = fields.Nested(CommentSchema(many=True), dump_only=True)
+    comments = fields.Method('get_visible_comments', dump_only=True)
     user_id = fields.Int(load_only=True)
     categories = fields.List(fields.Int(), load_only=True)
     categories_data = fields.Nested(
@@ -48,6 +48,15 @@ class PostSchema(Schema):
         attribute="categories"
     )
 
+    def get_visible_comments(self, post_obj):
+        try:
+            visible_comments = post_obj.comments.filter_by(
+                is_visible=True
+            ).order_by(Comment.date_created.asc()).all()
+            return CommentSchema(many=True).dump(visible_comments)
+        except Exception as e:
+            print(f"Error al serializar comentarios visibles: {e}")
+            return []
 
 class RoleUpdateSchema(Schema):
     role = fields.Str(required=True, validate=validate.OneOf(['admin', 'user', 'moderator']))
