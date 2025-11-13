@@ -1,5 +1,6 @@
 from app import db
-from models import Post, Category
+from models import Post, Comment
+from sqlalchemy import func
 
 class PostRepository:
     
@@ -21,3 +22,22 @@ class PostRepository:
 
     def update(self):
         db.session.commit()
+
+    def delete(self, post):
+        post.is_published = False
+        
+        if hasattr(post.comments, 'update'):
+             post.comments.update({Comment.is_visible: False}, synchronize_session=False)
+        
+        db.session.commit()
+
+    def count_published(self):
+        return Post.query.filter_by(is_published=True).count()
+
+    def count_last_week(self):
+        from app import db 
+        return Post.query.filter(
+            Post.date_created >= func.now() - db.text('INTERVAL 7 DAY'),
+            Post.is_published == True
+        ).count()
+    

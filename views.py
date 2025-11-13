@@ -1,6 +1,8 @@
 from services.post_service import PostService
 from services.comment_service import CommentService
 from services.user_service import UserService
+from services.category_service import CategoryService
+from services.stats_service import StatsService 
 
 from datetime import timedelta
 from flask.views import MethodView
@@ -90,25 +92,17 @@ class LoginAPI(MethodView):
         return jsonify(tokens), 200
     
 class RefreshAPI(MethodView):
+    def __init__(self):
+        self.user_service = UserService()
+
     @jwt_required(refresh=True)
     def post(self):
         identity = get_jwt_identity()
-        user = User.query.get(int(identity))
-        if not user or not user.is_active:
-            return {'message': 'Usuario no encontrado o inactivo'}, 404
-        
-        additional_claims = {
-            'email': user.email,
-            'role': user.credential.role,
-            'username': user.username
-        }
-    
-        new_access_token = create_access_token(
-            identity=identity,
-            additional_claims=additional_claims,
-            expires_delta=timedelta(hours=24)
-        )
-        return jsonify(access_token=new_access_token)
+        try:
+            new_access_token = self.user_service.refresh_access_token(identity)
+            return jsonify(access_token=new_access_token), 200
+        except ValueError as e:
+            return {'message': str(e)}, 404
 
 class PostAPI(MethodView):
     def __init__(self):
@@ -170,13 +164,17 @@ class PostDetailAPI(MethodView):
 
     @jwt_required()
     def delete(self, post_id):
-        post = self.post_service.get_post(post_id) 
-        if not is_admin_or_owner(post.user_id):
-            return jsonify(error="No tienes permiso para eliminar este post"), 403
+        user_id = get_user_identity_from_jwt()
+        claims = get_jwt()
+        role = claims.get('role')
 
-        self.post_service.delete_post(post_id)
-        
-        return jsonify(message="Post eliminado correctamente"), 200
+        try:
+            self.post_service.delete_post(post_id, user_id, role)
+            return jsonify(message="Post eliminado correctamente"), 200
+        except PermissionError as e:
+            return jsonify(error=str(e)), 403
+        except Exception as e:
+            return jsonify(error="Error al eliminar el post"), 500
 
     
 class CommentAPI(MethodView):
@@ -250,8 +248,11 @@ class CommentListAPI(MethodView):
             return {'error': 'Error al crear el comentario'}, 400
           
 class CategoryAPI(MethodView):
+    def __init__(self):
+        self.category_service = CategoryService()
+
     def get(self):
-        categories = Category.query.filter_by(is_visible=True).all()
+        categories = self.category_service.get_all_categories()
         return CategorySchema(many=True).dump(categories), 200
     
     @jwt_required()
@@ -262,36 +263,35 @@ class CategoryAPI(MethodView):
         except ValidationError as err:
             return jsonify({'success': False, 'errors': err.messages}), 400
         
-        if Category.query.filter_by(name=data.get('name')).first():
-            return jsonify({'success': False, 'message': 'Esa categoría ya existe.'}), 400
-        
-        new_category = Category(name=data['name'])
-        db.session.add(new_category)
-        db.session.commit()
-
-        return CategorySchema().dump(new_category), 201
+        try:
+            new_category = self.category_service.create_category(data['name'])
+            return CategorySchema().dump(new_category), 201
+        except ValueError as e:
+            return jsonify({'success': False, 'message': str(e)}), 400
     
 
 class CategoryDetailAPI(MethodView):
+    def __init__(self):
+        self.category_service = CategoryService()
+
     @jwt_required()
     @role_required('admin', 'moderator')
     def put(self, category_id):
-        category = Category.query.get_or_404(category_id)
         try:
             data = CategorySchema().load(request.json)
         except ValidationError as err:
             return {'errors': err.messages}, 400
 
-        category.name = data['name']
-        db.session.commit()
-        return {'message': 'Category updated'}, 200
+        try:
+            self.category_service.update_category(category_id, data['name'])
+            return {'message': 'Category updated'}, 200
+        except ValueError as e:
+             return {'error': str(e)}, 400
     
     @jwt_required()
     @role_required('admin')
     def delete(self, category_id):
-        category = Category.query.get_or_404(category_id)
-        category.is_visible = False
-        db.session.commit()
+        self.category_service.delete_category(category_id)
         return {'message': 'Category deleted'}, 200
     
 class UserAPI(MethodView):
@@ -358,21 +358,11 @@ class UserStatusAPI(MethodView):
 
 
 class StatsAPI(MethodView):
+    def __init__(self):
+        self.stats_service = StatsService()
+
     @jwt_required()
     @role_required('admin', 'moderator')
     def get(self):
-        total_posts = Post.query.filter_by(is_published=True).count()
-        total_comments = Comment.query.filter_by(is_visible=True).count()
-        total_users = User.query.filter_by(is_active=True).count()
-        post_last_week = Post.query.filter(
-            Post.date_created >= db.func.now() - db.text('INTERVAL 7 DAY'),
-            Post.is_published == True
-        ).count()
-
-        stats = {
-            'total_posts': total_posts,
-            'total_comments': total_comments,
-            'total_users': total_users,
-            'posts_last_week': post_last_week
-        }
+        stats = self.stats_service.get_dashboard_stats()
         return jsonify(stats), 200

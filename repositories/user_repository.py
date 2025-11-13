@@ -30,3 +30,6 @@ class UserRepository:
 
     def update(self):
         db.session.commit()
+
+    def count_active(self):
+        return User.query.filter_by(is_active=True).count()

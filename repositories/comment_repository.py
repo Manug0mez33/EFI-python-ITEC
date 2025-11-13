@@ -16,3 +16,6 @@ class CommentRepository:
 
     def update(self):
         db.session.commit()
+    
+    def count_visible(self):
+        return Comment.query.filter_by(is_visible=True).count()

@@ -24,14 +24,16 @@ class PostService:
 
         return self.post_repository.create(new_post)
 
-    def delete_post(self, post_id):
-        post = self.post_repository.get_by_id_or_404(post_id)
+    def delete_post(self, post_id, user_id, role):
+        post = self.post_repository.get_by_id(post_id)
         
-        post.is_published = False
-        
-        post.comments.update({Comment.is_visible: False}, synchronize_session=False)
-        
-        self.post_repository.update()
+        if not post:
+            return 
+
+        if post.user_id != user_id and role != 'admin':
+            raise PermissionError("No tienes permiso para eliminar este post")
+
+        self.post_repository.delete(post)
 
     def update_post(self, post_id, data, user_id, role):
         post = self.post_repository.get_by_id(post_id) 

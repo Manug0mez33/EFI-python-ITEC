@@ -2,6 +2,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import create_access_token, create_refresh_token
 from repositories.user_repository import UserRepository
 from models import User, UserCredentials
+from datetime import timedelta
 
 class UserService:
     def __init__(self):
@@ -73,3 +74,24 @@ class UserService:
         user = self.user_repository.get_by_id_or_404(user_id)
         user.is_active = False
         self.user_repository.update()
+
+    def refresh_access_token(self, identity):
+        user_id = int(identity)
+        user = self.user_repository.get_by_id(user_id)
+
+        if not user or not user.is_active:
+             raise ValueError("Usuario no encontrado o inactivo")
+
+        additional_claims = {
+            'email': user.email,
+            'role': user.credential.role,
+            'username': user.username
+        }
+        
+        new_access_token = create_access_token(
+            identity=identity,
+            additional_claims=additional_claims,
+            expires_delta=timedelta(hours=24) 
+        )
+        
+        return new_access_token
