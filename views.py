@@ -1,5 +1,6 @@
 from services.post_service import PostService
 from services.comment_service import CommentService
+from services.user_service import UserService
 
 from datetime import timedelta
 from flask.views import MethodView
@@ -49,48 +50,31 @@ def is_admin_or_owner(resource_owner_id: int) -> bool:
     return False
 
 class UserRegisterAPI(MethodView):
+    def __init__(self):
+        self.user_service = UserService()
+
     def post(self):
         try:
             data = RegisterSchema().load(request.json)
         except ValidationError as err:
             return {'errors': err.messages}, 400
         
-        if User.query.filter_by(email=data['email']).first():
-            return {'message': 'Esta direccion de correo ya ha sido utilizada'}, 400
-
-        new_user = User(
-            username=data['username'],
-            email=data['email'],
-            is_active=True
-        )
-        db.session.add(new_user)
-        db.session.flush()
-
-        password_hash = generate_password_hash(data['password'], method='pbkdf2:sha256')
-        credentials = UserCredentials(
-            user_id=new_user.id,
-            password_hash=password_hash,
-            role=data['role']
-        )
-        db.session.add(credentials)
-
-        additional_claims = {
-            'email': new_user.email,
-            'role': credentials.role,
-            'username': new_user.username
-        }
-
-        identity = str(new_user.id)
-        access_token = create_access_token(
-            identity=identity,
-            additional_claims=additional_claims
-        )
-
-        db.session.commit()
-        return jsonify(access_token=access_token), 201
-    
+        try:
+            tokens = self.user_service.register_user(
+                username=data['username'],
+                email=data['email'],
+                password=data['password'],
+                role=data['role']
+            )
+            return jsonify(tokens), 201
+            
+        except ValueError as e:
+            return {'message': str(e)}, 400
 
 class LoginAPI(MethodView):
+    def __init__(self):
+        self.user_service = UserService()
+
     @limiter.limit('10 per hour')
     def post(self):
         try:
@@ -98,27 +82,12 @@ class LoginAPI(MethodView):
         except ValidationError as err:
             return {'errors': err.messages}, 400
 
-        user = User.query.filter_by(email=data['email']).first()
-        if not user or not user.credential:
-            return {'message': 'Usuario no encontrado'}, 404
+        tokens = self.user_service.authenticate(data['email'], data['password'])
 
-        if not check_password_hash(user.credential.password_hash, data['password']):
+        if not tokens:
             return {'message': 'Credenciales inválidas'}, 401
 
-        additional_claims = {
-            'email': user.email,
-            'role': user.credential.role,
-            'username': user.username
-            }
-
-        identity = str(user.id)
-        access_token = create_access_token(
-            identity=identity,
-            additional_claims=additional_claims
-        )
-        refresh_token = create_refresh_token(identity=identity)
-
-        return jsonify(access_token=access_token, refresh_token=refresh_token)
+        return jsonify(tokens), 200
     
 class RefreshAPI(MethodView):
     @jwt_required(refresh=True)
@@ -326,31 +295,41 @@ class CategoryDetailAPI(MethodView):
         return {'message': 'Category deleted'}, 200
     
 class UserAPI(MethodView):
+    def __init__(self):
+        self.user_service = UserService()
+
     @jwt_required()
     @role_required('admin')
     def get(self):
-        users = User.query.options(
-            joinedload(User.credential)
-        ).all()
+        users = self.user_service.get_all_users()
         return UserSchema(many=True).dump(users), 200
-    
+
 class UserDetailAPI(MethodView):
+    def __init__(self):
+        self.user_service = UserService()
+
     @jwt_required()
     def get(self, user_id):
-        if not is_admin_or_owner(user_id):
-            return {'error': 'Acceso denegado: permisos insuficientes'}, 403
-        user = User.query.get_or_404(user_id)
-        return UserSchema().dump(user), 200
+        requester_id = int(get_jwt_identity())
+        claims = get_jwt()
+        role = claims.get('role')
+
+        try:
+            user = self.user_service.get_user_detail(user_id, requester_id, role)
+            return UserSchema().dump(user), 200
+        except PermissionError as e:
+            return {'error': str(e)}, 403
        
     @jwt_required()
     @role_required('admin')
     def delete(self, user_id):
-        user = User.query.get_or_404(user_id)
-        user.is_active = False
-        db.session.commit()
+        self.user_service.delete_user(user_id)
         return {'message': 'Usuario desactivado'}, 200
-    
+
 class UserRoleAPI(MethodView):
+    def __init__(self):
+        self.user_service = UserService()
+
     @jwt_required()
     @role_required('admin')
     def patch(self, user_id):
@@ -359,12 +338,13 @@ class UserRoleAPI(MethodView):
         except ValidationError as err:
             return {'errors': err.messages}, 400
 
-        user = User.query.get_or_404(user_id)
-        user.credential.role = data['role']
-        db.session.commit()
+        self.user_service.update_user_role(user_id, data['role'])
         return {'message': 'Rol de usuario actualizado'}, 200
-    
+
 class UserStatusAPI(MethodView):
+    def __init__(self):
+        self.user_service = UserService()
+
     @jwt_required()
     @role_required('admin')
     def patch(self, user_id):
@@ -373,9 +353,7 @@ class UserStatusAPI(MethodView):
         except ValidationError as err:
             return {'errors': err.messages}, 400
 
-        user = User.query.get_or_404(user_id)
-        user.is_active = data['is_active']
-        db.session.commit()
+        self.user_service.update_user_status(user_id, data['is_active'])
         return jsonify({'message': 'Estado de usuario actualizado'}), 200
 
 
