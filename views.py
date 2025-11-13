@@ -4,25 +4,19 @@ from services.user_service import UserService
 from services.category_service import CategoryService
 from services.stats_service import StatsService 
 
-from datetime import timedelta
 from flask.views import MethodView
 from flask import request, jsonify
 from marshmallow import ValidationError
-from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import (
     jwt_required,
-    create_access_token,
-    create_refresh_token,
     get_jwt,
     get_jwt_identity
 )
 from flask_login import current_user
 
 from functools import wraps
-from sqlalchemy.orm import joinedload, subqueryload
-from schemas import UserSchema, RegisterSchema, LoginSchema, PostSchema, CommentSchema, CategorySchema, RoleUpdateSchema, NotificationSchema
-from models import User, UserCredentials, Post, Comment, Category, Notification
-from app import db, limiter
+from schemas import UserSchema, RegisterSchema, LoginSchema, PostSchema, CommentSchema, CategorySchema, RoleUpdateSchema
+from app import limiter
 
 def get_user_identity_from_jwt():
     return int(get_jwt_identity())
@@ -39,17 +33,6 @@ def role_required(*allowed_roles: str):
             return fn(*args, **kwargs)
         return wrapper
     return decorator
-    
-def is_admin_or_owner(resource_owner_id: int) -> bool:
-    claims = get_jwt()
-    current_user_role = claims.get('role')
-    if current_user_role == 'admin':
-        return True
-    
-    user_id = int(get_jwt_identity())
-    if user_id == resource_owner_id:
-        return True
-    return False
 
 class UserRegisterAPI(MethodView):
     def __init__(self):
