@@ -32,3 +32,27 @@ class PostService:
         post.comments.update({Comment.is_visible: False}, synchronize_session=False)
         
         self.post_repository.update()
+
+    def update_post(self, post_id, data, user_id, role):
+        post = self.post_repository.get_by_id(post_id) 
+
+        if not post:
+            return None, "Post no encontrado"
+
+        if post.user_id != user_id and role != 'admin':
+            raise PermissionError("No tienes permiso para editar este post")
+
+        if 'title' in data:
+            post.title = data['title']
+        if 'content' in data:
+            post.content = data['content']
+            
+        if 'categories' in data:
+            category_ids = data['categories']
+            categories_objects = Category.query.filter(Category.id.in_(category_ids)).all()
+            
+            post.categories = categories_objects
+
+        self.post_repository.update()
+
+        return post

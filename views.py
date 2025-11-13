@@ -1,4 +1,6 @@
 from services.post_service import PostService
+from services.comment_service import CommentService
+
 from datetime import timedelta
 from flask.views import MethodView
 from flask import request, jsonify
@@ -174,6 +176,30 @@ class PostDetailAPI(MethodView):
         return PostSchema().dump(post), 200
 
     @jwt_required()
+    def put(self, post_id):
+        user_id = get_user_identity_from_jwt()
+        claims = get_jwt()
+        role = claims.get('role')
+
+        try:
+            data = PostSchema(partial=True).load(request.json)
+        except ValidationError as err:
+            return {'errors': err.messages}, 400
+        
+        try:
+            updated_post = self.post_service.update_post(post_id, data, user_id, role)
+            
+            if updated_post is None: 
+                 return {'error': 'Post no encontrado'}, 404
+                 
+            return PostSchema().dump(updated_post), 200
+
+        except PermissionError as e:
+            return {'error': str(e)}, 403
+        except Exception as e:
+            return {'error': 'Error interno al actualizar'}, 500
+
+    @jwt_required()
     def delete(self, post_id):
         post = self.post_service.get_post(post_id) 
         if not is_admin_or_owner(post.user_id):
@@ -185,13 +211,11 @@ class PostDetailAPI(MethodView):
 
     
 class CommentAPI(MethodView):
+    def __init__(self):
+        self.comment_service = CommentService()
+
     @jwt_required()
     def put(self, comment_id):
-        comment = Comment.query.get_or_404(comment_id)
-
-        if not is_admin_or_owner(comment.user_id):
-            return {'error': 'Acceso denegado: permisos insuficientes'}, 403
-        
         try:
             data = CommentSchema(partial=True).load(request.json)
         except ValidationError as err:
@@ -199,62 +223,62 @@ class CommentAPI(MethodView):
 
         if 'content' not in data:
             return {'errors': 'El contenido es requerido'}, 400
+            
+        user_id = int(get_jwt_identity())
+        claims = get_jwt()
+        role = claims.get('role')
 
-        comment.content = data['content']
-        db.session.commit()
-        return CommentSchema().dump(comment), 200
-    
+        try:
+            updated_comment = self.comment_service.update_comment(
+                comment_id=comment_id,
+                new_content=data['content'],
+                user_id=user_id,
+                role=role
+            )
+            return CommentSchema().dump(updated_comment), 200
+        except PermissionError as e:
+            return {'error': str(e)}, 403
 
     @jwt_required()
     def delete(self, comment_id):
-        comment = Comment.query.get_or_404(comment_id)
+        user_id = int(get_jwt_identity())
         claims = get_jwt()
-        current_user_role = claims.get('role')
+        role = claims.get('role')
 
-        if (not is_admin_or_owner(comment.user_id)) and (current_user_role != 'moderator'):
-            return {'error': 'Acceso denegado: permisos insuficientes'}, 403
-        else:
-            comment.is_visible = False
-            db.session.commit()
-            return {'message': 'Comment deleted'}, 200
+        try:
+            self.comment_service.delete_comment(comment_id, user_id, role)
+            return {'message': 'Comentario eliminado'}, 200
+        except PermissionError as e:
+            return {'error': str(e)}, 403
+
 
 class CommentListAPI(MethodView):
+    def __init__(self):
+        self.comment_service = CommentService()
+
     def get(self, post_id):
-        post = Post.query.get_or_404(post_id)
-        visible_comments = post.comments.filter_by(is_visible=True)
+        visible_comments = self.comment_service.get_post_comments(post_id)
         return CommentSchema(many=True).dump(visible_comments), 200
     
     @jwt_required()
     @limiter.limit('30 per hour', key_func=get_user_identity_from_jwt)
     def post(self, post_id):
-        post = Post.query.get_or_404(post_id)
-        current_user = int(get_jwt_identity())
+        user_id = int(get_jwt_identity())
 
         try:
             data = CommentSchema().load(request.json)
         except ValidationError as err:
             return {'errors': err.messages}, 400
         
-        new_comment = Comment(
-            content=data['content'],
-            post_id=post.id,
-            user_id=current_user
-        )
-        db.session.add(new_comment)
-        db.session.commit()
-
-        if post.user_id != current_user:
-            actor = User.query.get(current_user)
-            notification = Notification(
-                user_id=post.user_id,
-                actor_id=current_user,
-                post_id=post.id,
-                message=f'{actor.username} ha comentado en tu publicación.'
+        try:
+            new_comment = self.comment_service.create_comment(
+                content=data['content'],
+                post_id=post_id,
+                user_id=user_id
             )
-            db.session.add(notification)
-            db.session.commit()
-
-        return CommentSchema().dump(new_comment), 201
+            return CommentSchema().dump(new_comment), 201
+        except Exception as e:
+            return {'error': 'Error al crear el comentario'}, 400
           
 class CategoryAPI(MethodView):
     def get(self):
