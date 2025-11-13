@@ -1,3 +1,4 @@
+from services.post_service import PostService
 from datetime import timedelta
 from flask.views import MethodView
 from flask import request, jsonify
@@ -139,119 +140,48 @@ class RefreshAPI(MethodView):
         return jsonify(access_token=new_access_token)
 
 class PostAPI(MethodView):
+    def __init__(self):
+        self.post_service = PostService()
+
     def get(self):
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 10, type=int)
-
-        author_username = request.args.get('author_username', type=str)
-        category_name = request.args.get('category_name', type=str)
-
-        query = Post.query.options(
-            joinedload(Post.user),
-
-            joinedload(Post.categories)
-        ).filter_by(is_published=True)
-
-        if author_username:
-            query = query.join(User).filter(User.username == author_username)
-
-        if category_name:
-            query = query.filter(Post.categories.any(name=category_name)) 
-
-        query = query.order_by(Post.date_created.desc())
-
-        paginated_posts = query.paginate(
-            page=page,
-            per_page=per_page,
-            error_out=False
-        )
-
-        return jsonify({
-            'posts': PostSchema(many=True).dump(paginated_posts.items),
-            'pagination': {
-                'total_pages': paginated_posts.pages,
-                'total_items': paginated_posts.total,
-                'current_page': paginated_posts.page,
-                'per_page': paginated_posts.per_page,
-                'has_next': paginated_posts.has_next,
-                'has_prev': paginated_posts.has_prev
-            }
-        }), 200
+        posts = self.post_service.get_all_posts()
+        return PostSchema(many=True).dump(posts), 200
 
     @jwt_required()
-    @limiter.limit('10 per hour', key_func=get_user_identity_from_jwt)
     def post(self):
-        current_user = get_jwt_identity()
         try:
             data = PostSchema().load(request.json)
         except ValidationError as err:
             return {'errors': err.messages}, 400
+            
+        user_id = get_user_identity_from_jwt()
 
-        category_ids = data.pop('categories', [])
-        
-        new_post = Post(
+        new_post = self.post_service.create_post(
             title=data['title'],
             content=data['content'],
-            user_id=int(current_user)
+            user_id=user_id,
+            category_ids=data.get('categories', [])
         )
-
-        if category_ids:
-            categories_to_add = Category.query.filter(Category.id.in_(category_ids)).all()
-            new_post.categories.extend(categories_to_add)
-
-        try:
-            db.session.add(new_post)
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            return {'error': str(e)}, 500
-
+        
         return PostSchema().dump(new_post), 201
     
 class PostDetailAPI(MethodView):
+    def __init__(self):
+        self.post_service = PostService()
+
     def get(self, post_id):
-        post = Post.query.filter_by(id=post_id, is_published=True).first_or_404()
+        post = self.post_service.get_post(post_id)
         return PostSchema().dump(post), 200
-    
+
     @jwt_required()
     def delete(self, post_id):
-        post = Post.query.get_or_404(post_id)
+        post = self.post_service.get_post(post_id) 
         if not is_admin_or_owner(post.user_id):
-            return {'error': 'Acceso denegado: permisos insuficientes'}, 403
+            return jsonify(error="No tienes permiso para eliminar este post"), 403
+
+        self.post_service.delete_post(post_id)
         
-        post.comments.update(
-            {Comment.is_visible: False},
-            synchronize_session=False
-        )
-
-        post.is_published = False
-        db.session.commit()
-        return {'message': 'Post deleted'}, 200
-    
-    @jwt_required()
-    def put(self, post_id):
-        post = Post.query.get_or_404(post_id)
-        try:
-            data = PostSchema().load(request.json)
-        except ValidationError as err:
-            return {'errors': err.messages}, 400
-
-        if not is_admin_or_owner(post.user_id):
-            return {'error': 'Acceso denegado: permisos insuficientes'}, 403
-        
-        category_ids = data.pop('categories', [])
-
-        post.title = data['title']
-        post.content = data['content']
-
-        if category_ids:
-            categories_to_add = Category.query.filter(Category.id.in_(category_ids)).all()
-            post.categories = categories_to_add
-        else:
-            post.categories = []
-            
-        db.session.commit()
-        return PostSchema().dump(post), 200
+        return jsonify(message="Post eliminado correctamente"), 200
 
     
 class CommentAPI(MethodView):
